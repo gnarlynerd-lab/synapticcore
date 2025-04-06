@@ -1,0 +1,38 @@
+# SynapticCore specific files
+*_store.json
+memory_store.json
+enhanced_memory.json
+feedback_history.json
+*.json
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+scagent_env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# OS specific files
+.DS_Store
+Thumbs.db
