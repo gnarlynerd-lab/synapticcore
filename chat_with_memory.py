@@ -14,6 +14,7 @@ import requests
 from datetime import datetime
 from simple_memory_system import MemorySystem
 from enhanced_memory_system import enhance_memory_system
+from narrative_memory_system import enhance_with_narrative_capabilities, integrate_narrative_with_feedback, integrate_narrative_with_chat
 from memory_feedback_loop import MemoryFeedbackLoop, integrate_with_chat
 
 class DeepSeekClient:
@@ -72,7 +73,9 @@ def main():
     
     # Initialize the memory system
     memory_system = MemorySystem(storage_path="memory_store.json")
-    memory_system = enhance_memory_system(memory_system)
+    memory_system = enhance_memory_system(memory_system) 
+    memory_system = enhance_with_narrative_capabilities(memory_system)
+    #memory_system = enhance_memory_system(memory_system)
     
     # Check for API key
     api_key = os.environ.get("DEEPSEEK_API_KEY")
@@ -84,9 +87,13 @@ def main():
     
     # Initialize feedback loop
     feedback_loop = MemoryFeedbackLoop(memory_system)
+    feedback_loop = integrate_narrative_with_feedback(feedback_loop, deepseek_client)
+
     
     # Get the chat function with memory search
-    chat_function = integrate_with_chat(memory_system, deepseek_client)
+    #chat_function = integrate_with_chat(memory_system, deepseek_client)
+    chat_function = integrate_narrative_with_chat(memory_system, deepseek_client, use_enhanced_search=True)
+
     
     print("\nMemory stats:")
     print(f"  {len(memory_system.memories)} memories loaded")
