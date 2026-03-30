@@ -213,11 +213,11 @@ class TestMCPActivationIntegration:
         server_module._core = None
 
         store_interaction(
-            positions=[
+            decisions=[
                 {"statement": "Functional programming reduces side effects", "confidence": "held"},
                 {"statement": "Pure functions are easier to test", "confidence": "committed"},
             ],
-            tensions=[
+            tradeoffs=[
                 {"poles": ["purity", "practicality"], "description": "Pure FP vs pragmatic code"}
             ],
         )
@@ -240,8 +240,8 @@ class TestMCPActivationIntegration:
         server_module._core = None
 
         store_interaction(
-            positions=[{"statement": "We should use TypeScript", "confidence": "held"}],
-            tensions=[{"poles": ["type safety", "velocity"], "description": "Types vs speed"}],
+            decisions=[{"statement": "We should use TypeScript", "confidence": "held"}],
+            tradeoffs=[{"poles": ["type safety", "velocity"], "description": "Types vs speed"}],
         )
 
         result = find_adjacent("type safety in code")

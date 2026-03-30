@@ -1,7 +1,8 @@
 """
 SynapticCore MCP Server.
 
-Exposes cognitive memory tools via the Model Context Protocol.
+Exposes user narrative memory tools via the Model Context Protocol.
+Tracks decisions, tradeoffs, and constraints — not atomic facts.
 Run with: python -m synapticcore.mcp.server
 """
 
@@ -15,13 +16,11 @@ logging.basicConfig(
     level=logging.WARNING,
     format="%(name)s: %(message)s",
 )
-# Suppress noisy libraries
 logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("httpx").setLevel(logging.ERROR)
 logging.getLogger("httpcore").setLevel(logging.ERROR)
 
-# Suppress HuggingFace progress bars
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
@@ -36,19 +35,21 @@ STORAGE_PATH = os.environ.get("SYNAPTICCORE_STORAGE", "memory_store.json")
 mcp = FastMCP(
     name="SynapticCore",
     instructions=(
-        "SynapticCore is a cognitive memory system that tracks how your thinking evolves. "
-        "It stores positions, tensions, and precedents — not atomic facts — and retrieves "
-        "structurally adjacent material through spreading activation. "
-        "Use store_interaction after meaningful exchanges. "
-        "Use retrieve_relevant to get context before responding. "
-        "Use get_intellectual_arc to trace how positions evolved. "
-        "Use find_adjacent to discover unexplored territory. "
-        "Use check_precedent to look up established commitments. "
-        "Use assess_depth to evaluate conversation engagement with deeper structure."
+        "SynapticCore tracks how a user navigates decisions, tradeoffs, and "
+        "constraints over time. It doesn't store atomic facts — it maintains "
+        "the structured map of what's settled, what's still open, and what "
+        "constrains what. "
+        "Use store_interaction after meaningful exchanges to record decisions, "
+        "tradeoffs, and constraints. "
+        "Use retrieve_relevant to get context before responding — in deep mode "
+        "it returns structurally adjacent material through spreading activation. "
+        "Use get_decision_narrative to trace how the user's approach evolved. "
+        "Use find_adjacent to discover unaddressed territory. "
+        "Use check_constraints to find constraints that should apply. "
+        "Use assess_depth to check if deeper context is available."
     ),
 )
 
-# Initialize core on first use (lazy to avoid slow startup blocking MCP handshake)
 _core: SynapticCore | None = None
 
 
@@ -64,56 +65,62 @@ def get_core() -> SynapticCore:
 
 @mcp.tool()
 def store_interaction(
-    positions: list[dict] | None = None,
-    tensions: list[dict] | None = None,
-    precedents: list[dict] | None = None,
+    decisions: list[dict] | None = None,
+    tradeoffs: list[dict] | None = None,
+    constraints: list[dict] | None = None,
     session_summary: str = "",
     relationship_hint: str = "",
 ) -> str:
-    """Store structured intellectual content from a conversation.
+    """Store decisions, tradeoffs, and constraints from a conversation.
 
-    Not a transcript or summary — store the positions held, tensions surfaced,
-    and precedents established or tested.
+    Not a transcript or summary — store what was decided, what's still
+    unresolved, and what constrains future choices.
 
-    Each position: {"statement": str, "confidence": "tentative"|"held"|"committed", "context": str}
-    Each tension: {"poles": [str, str], "description": str, "status": "active"|"explored"|"resolved"}
-    Each precedent: {"statement": str, "held": bool, "context": str}
-    relationship_hint: Optional hint about how new positions relate to existing ones,
-        e.g. "contradicts previous position on X" or "reinforces earlier commitment to Y".
+    Each decision: {"statement": str, "confidence": "tentative"|"held"|"committed", "context": str}
+      - tentative: exploring, not settled
+      - held: current working position, could change
+      - committed: settled, should bind future actions
+
+    Each tradeoff: {"poles": [str, str], "description": str, "status": "active"|"explored"|"resolved"}
+      - Recurring tradeoffs are features, not bugs. Track them.
+
+    Each constraint: {"statement": str, "held": bool, "context": str}
+      - A decision that was made and should bind future actions unless explicitly revisited.
+
+    relationship_hint: Optional hint about how new decisions relate to existing ones,
+        e.g. "contradicts previous decision on X" or "reinforces the budget commitment".
         The calling LLM has conversational context the memory system doesn't.
     """
     core = get_core()
     stored = []
     arc_detections = []
 
-    for pos in (positions or []):
+    for dec in (decisions or []):
         obj = core.positions.create(
-            statement=pos.get("statement", ""),
-            confidence=pos.get("confidence", "tentative"),
-            context=pos.get("context", ""),
+            statement=dec.get("statement", ""),
+            confidence=dec.get("confidence", "tentative"),
+            context=dec.get("context", ""),
         )
-        stored.append(f"position:{obj.id[:8]}")
-
-        # Auto-detect relationship to existing positions
+        stored.append(f"decision:{obj.id[:8]}")
         detection = core.arcs.detect_relationship(obj, relationship_hint=relationship_hint)
         if detection:
             arc_detections.append(detection)
 
-    for ten in (tensions or []):
+    for trd in (tradeoffs or []):
         obj = core.tensions.create(
-            poles=ten.get("poles", []),
-            description=ten.get("description", ""),
-            status=ten.get("status", "active"),
+            poles=trd.get("poles", []),
+            description=trd.get("description", ""),
+            status=trd.get("status", "active"),
         )
-        stored.append(f"tension:{obj.id[:8]}")
+        stored.append(f"tradeoff:{obj.id[:8]}")
 
-    for prec in (precedents or []):
+    for con in (constraints or []):
         obj = core.precedents.create(
-            statement=prec.get("statement", ""),
-            held=prec.get("held", True),
-            context=prec.get("context", ""),
+            statement=con.get("statement", ""),
+            held=con.get("held", True),
+            context=con.get("context", ""),
         )
-        stored.append(f"precedent:{obj.id[:8]}")
+        stored.append(f"constraint:{obj.id[:8]}")
 
     if session_summary:
         core.memory.add_memory(
@@ -122,15 +129,11 @@ def store_interaction(
             metadata={"type": "session_summary"}
         )
 
-    # Persist typed data
     core.save()
 
-    # Build response
     parts = [f"Stored {len(stored)} items: {', '.join(stored)}"]
     for det in arc_detections:
-        parts.append(
-            f"Arc detected: {det['type']} — {det['explanation']}"
-        )
+        parts.append(f"Narrative arc: {det['type']} — {det['explanation']}")
 
     return "\n".join(parts)
 
@@ -139,9 +142,9 @@ def _typed_search_results(core, query: str, top_k: int = 5) -> list[dict]:
     """Search across all typed managers and return unified results."""
     output = []
     for manager, type_name in [
-        (core.positions, "position"),
-        (core.tensions, "tension"),
-        (core.precedents, "precedent"),
+        (core.positions, "decision"),
+        (core.tensions, "tradeoff"),
+        (core.precedents, "constraint"),
     ]:
         for r in manager.search(query, top_k=top_k):
             item = r["item"]
@@ -152,19 +155,19 @@ def _typed_search_results(core, query: str, top_k: int = 5) -> list[dict]:
                 "timestamp": item.timestamp,
                 "retrieval_method": "typed_semantic",
             }
-            if type_name == "position":
+            if type_name == "decision":
                 entry["content"] = item.statement
                 entry["confidence"] = item.confidence
                 entry["context"] = item.context
                 entry["evolution"] = item.evolution
                 entry["categories"] = item.categories
-            elif type_name == "tension":
+            elif type_name == "tradeoff":
                 entry["content"] = item.description
                 entry["poles"] = item.poles
                 entry["status"] = item.status
                 entry["engagement_count"] = len(item.engagement_history)
                 entry["categories"] = item.categories
-            elif type_name == "precedent":
+            elif type_name == "constraint":
                 entry["content"] = item.statement
                 entry["held"] = item.held
                 entry["context"] = item.context
@@ -180,33 +183,35 @@ def retrieve_relevant(
     depth: str = "structural",
     max_results: int = 5,
 ) -> list[dict]:
-    """Retrieve intellectually relevant material from the user's history.
+    """Retrieve relevant context from the user's decision landscape.
 
-    Returns not just semantically similar content but structurally adjacent
-    material — things connected through the intellectual topology, not just
-    embedding similarity.
+    Returns decisions, tradeoffs, and constraints that connect to the
+    current conversation — not just semantically similar content but
+    structurally adjacent material from the user's narrative.
 
     Args:
-        current_context: What the user is currently exploring.
+        current_context: What the user is currently working on or discussing.
         depth: "surface" (semantic only), "structural" (+ typed search),
-               "deep" (+ spreading activation through topology).
+               "deep" (+ spreading activation through the decision landscape).
         max_results: Maximum results to return.
     """
     core = get_core()
 
     if depth == "deep":
-        # Use spreading activation for deep retrieval
         from ..retrieval.activation import ActivationConfig
         config = ActivationConfig(max_hops=3, decay_rate=0.5)
         nodes = core.activation.activate([current_context], config)
 
+        # Map internal types to user-facing vocabulary
+        type_map = {"position": "decision", "tension": "tradeoff", "precedent": "constraint"}
+
         output = []
         for node in nodes:
             if node.node_type == "category":
-                continue  # Skip category nodes in output
+                continue
             entry = {
                 "content": node.content[:300],
-                "type": node.node_type,
+                "type": type_map.get(node.node_type, node.node_type),
                 "score": round(node.activation, 3),
                 "retrieval_method": f"activation_depth_{node.depth}",
                 "activation_path": [p.split(":", 1)[-1][:12] for p in node.path],
@@ -217,7 +222,6 @@ def retrieve_relevant(
             output.append(entry)
         return output[:max_results]
 
-    # Surface and structural: semantic + typed search
     depth_to_recursive = {"surface": 0, "structural": 1}
     recursive_depth = depth_to_recursive.get(depth, 1)
 
@@ -251,51 +255,70 @@ def retrieve_relevant(
 
 
 @mcp.tool()
-def get_intellectual_arc(
+def get_decision_narrative(
     topic: str,
     time_range: str | None = None,
 ) -> dict:
-    """Trace how the user's position on a topic has evolved over time.
+    """Trace how the user's approach to a topic evolved over time.
 
-    Returns a chronological chain of positions with transition classifications
+    Returns a chronological chain of decisions with transition classifications
     (reinforcement/shift/reversal), trajectory analysis (converging/oscillating/
-    deepening), and recurring tensions.
+    deepening), and recurring tradeoffs.
 
     Args:
-        topic: The subject or tension to trace.
+        topic: The subject to trace (e.g. "kitchen budget", "architecture choices").
         time_range: Optional date range filter (not yet implemented).
     """
     core = get_core()
-    return core.arcs.get_arc(topic, time_range=time_range)
+    arc = core.arcs.get_arc(topic, time_range=time_range)
+
+    # Translate vocabulary in the response
+    return {
+        "topic": arc["topic"],
+        "decisions": arc["positions"],  # internal "positions" → user-facing "decisions"
+        "trajectory": arc["trajectory"],
+        "recurring_tradeoffs": arc["recurring_tensions"],
+        "summary": arc["summary"],
+    }
 
 
 @mcp.tool()
 def find_adjacent(
     current_context: str,
 ) -> dict:
-    """Identify unexplored territory bordering the user's intellectual topology.
+    """Identify unaddressed territory bordering the current conversation.
 
-    Uses spreading activation to find weakly-activated-but-reachable nodes —
-    territory that is structurally close to your current thinking but hasn't
-    been explored. Returns the frontier of your intellectual topology.
+    Uses spreading activation through the decision landscape to find
+    tradeoffs that haven't been explored, decisions that connect to the
+    current context but haven't been made, and gaps where constraints
+    may apply but haven't been checked.
     """
     core = get_core()
-    return core.activation.find_adjacent_territory(current_context)
+    result = core.activation.find_adjacent_territory(current_context)
+
+    # Map internal types in results
+    type_map = {"position": "decision", "tension": "tradeoff", "precedent": "constraint"}
+    for section in ("explored", "adjacent", "gap_tensions"):
+        for item in result.get(section, []):
+            if "type" in item:
+                item["type"] = type_map.get(item["type"], item["type"])
+
+    return result
 
 
 @mcp.tool()
-def check_precedent(
+def check_constraints(
     context: str,
 ) -> list[dict]:
-    """Look up whether the user has established relevant precedents.
+    """Find constraints that should apply to the current situation.
 
-    Searches for precedents and committed positions. Returns whether
-    they held or broke under pressure, with test history.
+    Returns constraints with test histories showing whether they've held
+    or been violated. Also returns committed decisions that function as
+    binding constraints.
     """
     core = get_core()
     output = []
 
-    # Search typed precedents
     for r in core.precedents.search(context, top_k=5):
         p = r["item"]
         output.append({
@@ -307,10 +330,9 @@ def check_precedent(
             "test_history": p.test_history,
             "dependencies": p.dependencies,
             "relevance": round(r["similarity"], 3),
-            "source": "precedent",
+            "source": "constraint",
         })
 
-    # Also find committed positions (precedent-like)
     for r in core.positions.search(context, top_k=5):
         p = r["item"]
         if p.confidence == "committed":
@@ -322,7 +344,7 @@ def check_precedent(
                 "timestamp": p.timestamp,
                 "test_history": [],
                 "relevance": round(r["similarity"], 3),
-                "source": "committed_position",
+                "source": "committed_decision",
             })
 
     output.sort(key=lambda x: x["relevance"], reverse=True)
@@ -334,76 +356,66 @@ def assess_depth(
     recent_exchange: str,
     current_topic: str,
 ) -> dict:
-    """Evaluate whether the conversation engages with the user's intellectual topology.
+    """Check if the conversation is engaging with the user's decision landscape.
 
-    This is an information tool — it tells the LLM "there's more here if you
-    want to go deeper" rather than making judgments.
+    Information tool — tells the LLM "there's relevant context here if you
+    want to go deeper." Not a judgment.
     """
     core = get_core()
 
-    # Count typed objects related to this topic
     pos_results = core.positions.search(current_topic, top_k=5)
     ten_results = core.tensions.search(current_topic, top_k=5)
     prec_results = core.precedents.search(current_topic, top_k=5)
 
-    types_found = {
-        "position": len(pos_results),
-        "tension": len(ten_results),
-        "precedent": len(prec_results),
+    material = {
+        "decisions": len(pos_results),
+        "tradeoffs": len(ten_results),
+        "constraints": len(prec_results),
     }
 
-    # Collect categories across all typed results
     categories_touched = set()
     for r in pos_results:
         categories_touched.update(r["item"].categories)
     for r in ten_results:
         categories_touched.update(r["item"].categories)
 
-    # High relevance items
     high_relevance = []
     for r in pos_results[:2]:
         high_relevance.append({
             "content": r["item"].statement[:100],
-            "type": "position",
+            "type": "decision",
             "confidence": r["item"].confidence,
             "score": round(r["similarity"], 3),
         })
     for r in ten_results[:2]:
         high_relevance.append({
             "content": r["item"].description[:100],
-            "type": "tension",
+            "type": "tradeoff",
             "poles": r["item"].poles,
             "score": round(r["similarity"], 3),
         })
 
-    # Check for active tensions
-    active_tensions = [r for r in ten_results if r["item"].status == "active"]
-
-    # Check recurring tensions via arc tracker
+    active_tradeoffs = [r for r in ten_results if r["item"].status == "active"]
     all_recurring = core.arcs.detect_recurring_tensions(min_engagements=2)
     recurring_nearby = [t for t in all_recurring if any(
         r["item"].id == t["id"] for r in ten_results
     )]
 
-    has_deeper_structure = (
-        types_found["position"] > 0 or
-        types_found["tension"] > 0 or
-        types_found["precedent"] > 0
-    )
+    has_deeper_structure = any(v > 0 for v in material.values())
 
     return {
         "topic": current_topic,
         "categories_connected": list(categories_touched),
-        "intellectual_material": types_found,
+        "narrative_material": material,
         "has_deeper_structure": has_deeper_structure,
-        "active_tensions_nearby": len(active_tensions),
-        "recurring_tensions_nearby": len(recurring_nearby),
+        "active_tradeoffs_nearby": len(active_tradeoffs),
+        "recurring_tradeoffs_nearby": len(recurring_nearby),
         "highly_relevant_items": high_relevance,
         "suggestion": (
-            "Deeper intellectual structure is available — positions, tensions, or precedents "
-            "connect to this topic. Consider engaging with them."
+            "There are decisions, tradeoffs, or constraints that connect to this topic. "
+            "Consider checking them before proceeding."
             if has_deeper_structure
-            else "This appears to be new territory. Consider storing positions or tensions that emerge."
+            else "This appears to be new territory. Consider storing decisions or tradeoffs that emerge."
         ),
     }
 

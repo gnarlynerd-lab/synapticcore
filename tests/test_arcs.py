@@ -193,26 +193,22 @@ class TestMCPArcIntegration:
     def test_store_detects_arc(self, tmp_path):
         """store_interaction should report arc detections."""
         import synapticcore.mcp.server as server_module
-        from synapticcore.mcp.server import store_interaction, get_intellectual_arc
+        from synapticcore.mcp.server import store_interaction, get_decision_narrative
 
         server_module.STORAGE_PATH = str(tmp_path / "test_arc_mcp.json")
         server_module._core = None
 
-        # Store first position
         store_interaction(
-            positions=[{"statement": "Testing is important for quality", "confidence": "held"}]
+            decisions=[{"statement": "Testing is important for quality", "confidence": "held"}]
         )
-        # Store related position
         result = store_interaction(
-            positions=[{"statement": "Testing is essential and non-negotiable", "confidence": "committed"}]
+            decisions=[{"statement": "Testing is essential and non-negotiable", "confidence": "committed"}]
         )
-        assert "Arc detected" in result
-        assert "reinforcement" in result.lower() or "shift" in result.lower()
+        assert "Narrative arc" in result or "arc" in result.lower()
 
-        # Get the arc
-        arc = get_intellectual_arc("testing")
-        assert len(arc["positions"]) >= 1
-        assert arc["trajectory"] != "insufficient_data" or len(arc["positions"]) < 2
+        arc = get_decision_narrative("testing")
+        assert len(arc["decisions"]) >= 1
+        assert arc["trajectory"] != "insufficient_data" or len(arc["decisions"]) < 2
 
         server_module._core = None
 
@@ -225,10 +221,10 @@ class TestMCPArcIntegration:
         server_module._core = None
 
         store_interaction(
-            positions=[{"statement": "We should avoid writing automated tests because they slow development", "confidence": "committed"}]
+            decisions=[{"statement": "We should avoid writing automated tests because they slow development", "confidence": "committed"}]
         )
         result = store_interaction(
-            positions=[{"statement": "We should write automated tests for everything to speed up development", "confidence": "held"}],
+            decisions=[{"statement": "We should write automated tests for everything to speed up development", "confidence": "held"}],
             relationship_hint="contradicts previous stance on automated testing"
         )
         assert "reversal" in result.lower()

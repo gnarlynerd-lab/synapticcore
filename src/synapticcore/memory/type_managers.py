@@ -187,6 +187,40 @@ class PositionManager(_TypeManager):
             pos.update_confidence(new_confidence, trigger)
         return pos
 
+    def supersede(self, old_id: str, new_statement: str,
+                  new_confidence: str = "held", context: str = "",
+                  **kwargs) -> Optional[Position]:
+        """Create a new position that explicitly replaces an old one.
+
+        The old position is marked as superseded (preserved, not deleted).
+        The chain is maintained for narrative tracking.
+        """
+        old = self.get_by_id(old_id)
+        if not old:
+            return None
+        new_pos = self.create(
+            statement=new_statement,
+            confidence=new_confidence,
+            context=context,
+            categories=old.categories,
+            related_tensions=old.related_tensions,
+            related_precedents=old.related_precedents,
+            **kwargs,
+        )
+        old.superseded_by = new_pos.id
+        new_pos.evolution.append({
+            "timestamp": new_pos.timestamp,
+            "type": "supersedes",
+            "related_position_id": old.id,
+            "previous_confidence": old.confidence,
+            "new_confidence": new_confidence,
+        })
+        return new_pos
+
+    def get_active(self) -> List[Position]:
+        """Return all positions that haven't been superseded."""
+        return [p for p in self.items if p.is_active]
+
     def find_related(self, position_id: str) -> dict:
         """Find tensions and precedents linked to a position."""
         pos = self.get_by_id(position_id)
@@ -226,6 +260,17 @@ class TensionManager(_TypeManager):
         if ten:
             ten.record_engagement(context, outcome)
         return ten
+
+    def resolve(self, tension_id: str, resolution: str) -> Optional[Tension]:
+        """Mark a tension as resolved with the given outcome."""
+        ten = self.get_by_id(tension_id)
+        if ten:
+            ten.resolve(resolution)
+        return ten
+
+    def get_active(self) -> List[Tension]:
+        """Return all unresolved tensions."""
+        return [t for t in self.items if t.status == "active"]
 
     def get_recurring(self, min_engagements: int = 2) -> List[Tension]:
         """Find tensions that keep surfacing."""

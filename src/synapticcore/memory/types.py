@@ -29,6 +29,7 @@ class Position:
     # [{timestamp, previous_confidence, new_confidence, trigger, related_position_id}]
     related_tensions: List[str] = field(default_factory=list)  # tension IDs
     related_precedents: List[str] = field(default_factory=list)  # precedent IDs
+    superseded_by: Optional[str] = None  # ID of position that replaced this one
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -43,8 +44,14 @@ class Position:
             "evolution": self.evolution,
             "related_tensions": self.related_tensions,
             "related_precedents": self.related_precedents,
+            "superseded_by": self.superseded_by,
             "metadata": self.metadata,
         }
+
+    @property
+    def is_active(self) -> bool:
+        """A position is active if it hasn't been superseded."""
+        return self.superseded_by is None
 
     @classmethod
     def from_dict(cls, data: dict) -> "Position":
@@ -79,6 +86,7 @@ class Tension:
     adjacent_tensions: List[str] = field(default_factory=list)  # tension IDs
     related_positions: dict = field(default_factory=dict)
     # {pole_index: [position_ids]} — which positions align with each pole
+    resolution: Optional[str] = None  # if resolved, what was decided
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -93,6 +101,7 @@ class Tension:
             "engagement_history": self.engagement_history,
             "adjacent_tensions": self.adjacent_tensions,
             "related_positions": self.related_positions,
+            "resolution": self.resolution,
             "metadata": self.metadata,
         }
 
@@ -106,6 +115,16 @@ class Tension:
             "timestamp": datetime.now().isoformat(),
             "context": context,
             "outcome": outcome,
+        })
+
+    def resolve(self, resolution_statement: str):
+        """Mark this tension as resolved with the given outcome."""
+        self.status = "resolved"
+        self.resolution = resolution_statement
+        self.engagement_history.append({
+            "timestamp": datetime.now().isoformat(),
+            "context": "resolved",
+            "outcome": resolution_statement,
         })
 
 
