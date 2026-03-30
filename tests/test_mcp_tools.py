@@ -55,10 +55,10 @@ class TestStoreInteraction:
                 {"statement": "Decentralization has practical limits", "confidence": "held", "context": "discussing system architecture"}
             ]
         )
-        assert "position:0" in result
+        assert "position:" in result
         core = get_core()
-        assert core.memory.memories[0]["metadata"]["type"] == "position"
-        assert core.memory.memories[0]["metadata"]["confidence"] == "held"
+        assert len(core.positions.items) == 1
+        assert core.positions.items[0].confidence == "held"
 
     def test_store_tensions(self):
         result = store_interaction(
@@ -66,10 +66,10 @@ class TestStoreInteraction:
                 {"poles": ["autonomy", "coordination"], "description": "tension between independence and teamwork", "status": "active"}
             ]
         )
-        assert "tension:0" in result
+        assert "tension:" in result
         core = get_core()
-        assert core.memory.memories[0]["metadata"]["type"] == "tension"
-        assert core.memory.memories[0]["metadata"]["poles"] == ["autonomy", "coordination"]
+        assert len(core.tensions.items) == 1
+        assert core.tensions.items[0].poles == ["autonomy", "coordination"]
 
     def test_store_precedents(self):
         result = store_interaction(
@@ -77,10 +77,10 @@ class TestStoreInteraction:
                 {"statement": "We always test before deploying", "held": True, "context": "post-incident review"}
             ]
         )
-        assert "precedent:0" in result
+        assert "precedent:" in result
         core = get_core()
-        assert core.memory.memories[0]["metadata"]["type"] == "precedent"
-        assert core.memory.memories[0]["metadata"]["held"] is True
+        assert len(core.precedents.items) == 1
+        assert core.precedents.items[0].held is True
 
     def test_store_mixed(self):
         result = store_interaction(
@@ -89,11 +89,14 @@ class TestStoreInteraction:
             precedents=[{"statement": "Use TypeScript for new projects", "held": True, "context": "team decision"}],
             session_summary="Discussed type safety tradeoffs"
         )
-        assert "position:0" in result
-        assert "tension:1" in result
-        assert "precedent:2" in result
+        assert "position:" in result
+        assert "tension:" in result
+        assert "precedent:" in result
         core = get_core()
-        assert len(core.memory.memories) == 4  # 3 items + 1 summary
+        assert len(core.positions.items) == 1
+        assert len(core.tensions.items) == 1
+        assert len(core.precedents.items) == 1
+        assert len(core.memory.memories) == 1  # just the session summary
 
     def test_store_empty(self):
         result = store_interaction()

@@ -82,41 +82,28 @@ def store_interaction(
     stored = []
 
     for pos in (positions or []):
-        mid = core.memory.add_memory(
-            content=pos.get("statement", ""),
-            categories=["position"],
-            metadata={
-                "type": "position",
-                "confidence": pos.get("confidence", "tentative"),
-                "context": pos.get("context", ""),
-            }
+        obj = core.positions.create(
+            statement=pos.get("statement", ""),
+            confidence=pos.get("confidence", "tentative"),
+            context=pos.get("context", ""),
         )
-        stored.append(f"position:{mid}")
+        stored.append(f"position:{obj.id[:8]}")
 
     for ten in (tensions or []):
-        poles = ten.get("poles", [])
-        mid = core.memory.add_memory(
-            content=ten.get("description", " vs ".join(poles)),
-            categories=["tension"],
-            metadata={
-                "type": "tension",
-                "poles": poles,
-                "status": ten.get("status", "active"),
-            }
+        obj = core.tensions.create(
+            poles=ten.get("poles", []),
+            description=ten.get("description", ""),
+            status=ten.get("status", "active"),
         )
-        stored.append(f"tension:{mid}")
+        stored.append(f"tension:{obj.id[:8]}")
 
     for prec in (precedents or []):
-        mid = core.memory.add_memory(
-            content=prec.get("statement", ""),
-            categories=["precedent"],
-            metadata={
-                "type": "precedent",
-                "held": prec.get("held", True),
-                "context": prec.get("context", ""),
-            }
+        obj = core.precedents.create(
+            statement=prec.get("statement", ""),
+            held=prec.get("held", True),
+            context=prec.get("context", ""),
         )
-        stored.append(f"precedent:{mid}")
+        stored.append(f"precedent:{obj.id[:8]}")
 
     if session_summary:
         core.memory.add_memory(
@@ -125,7 +112,49 @@ def store_interaction(
             metadata={"type": "session_summary"}
         )
 
+    # Persist typed data
+    core.save()
+
     return f"Stored {len(stored)} items: {', '.join(stored)}"
+
+
+def _typed_search_results(core, query: str, top_k: int = 5) -> list[dict]:
+    """Search across all typed managers and return unified results."""
+    output = []
+    for manager, type_name in [
+        (core.positions, "position"),
+        (core.tensions, "tension"),
+        (core.precedents, "precedent"),
+    ]:
+        for r in manager.search(query, top_k=top_k):
+            item = r["item"]
+            entry = {
+                "type": type_name,
+                "id": item.id,
+                "score": round(r["similarity"], 3),
+                "timestamp": item.timestamp,
+                "retrieval_method": "typed_semantic",
+            }
+            if type_name == "position":
+                entry["content"] = item.statement
+                entry["confidence"] = item.confidence
+                entry["context"] = item.context
+                entry["evolution"] = item.evolution
+                entry["categories"] = item.categories
+            elif type_name == "tension":
+                entry["content"] = item.description
+                entry["poles"] = item.poles
+                entry["status"] = item.status
+                entry["engagement_count"] = len(item.engagement_history)
+                entry["categories"] = item.categories
+            elif type_name == "precedent":
+                entry["content"] = item.statement
+                entry["held"] = item.held
+                entry["context"] = item.context
+                entry["test_count"] = len(item.test_history)
+                entry["categories"] = item.categories
+            output.append(entry)
+    return output
 
 
 @mcp.tool()
@@ -137,6 +166,7 @@ def retrieve_relevant(
     """Retrieve intellectually relevant material from the user's history.
 
     Returns not just semantically similar content but associatively related material.
+    Searches both generic memories and typed objects (positions, tensions, precedents).
 
     Args:
         current_context: What the user is currently exploring.
@@ -148,37 +178,36 @@ def retrieve_relevant(
     depth_to_recursive = {"surface": 0, "structural": 1, "deep": 2}
     recursive_depth = depth_to_recursive.get(depth, 1)
 
-    results = core.memory.enhanced_hybrid_search(
-        current_context,
-        top_k=max_results,
-        recursive_depth=recursive_depth,
+    # Search generic memories
+    memory_results = core.memory.enhanced_hybrid_search(
+        current_context, top_k=max_results, recursive_depth=recursive_depth,
     )
-
     output = []
-    for r in results:
+    for r in memory_results:
         memory = r["memory"]
-        entry = {
+        output.append({
             "content": memory["content"],
             "categories": memory.get("categories", []),
             "type": memory.get("metadata", {}).get("type", "memory"),
             "score": round(r["combined_score"], 3),
             "retrieval_method": r.get("retrieval_method", "unknown"),
             "timestamp": memory.get("timestamp", ""),
-        }
-        # Include type-specific metadata
-        meta = memory.get("metadata", {})
-        if meta.get("type") == "position":
-            entry["confidence"] = meta.get("confidence")
-            entry["context"] = meta.get("context")
-        elif meta.get("type") == "tension":
-            entry["poles"] = meta.get("poles")
-            entry["status"] = meta.get("status")
-        elif meta.get("type") == "precedent":
-            entry["held"] = meta.get("held")
-            entry["context"] = meta.get("context")
-        output.append(entry)
+        })
 
-    return output
+    # Search typed objects
+    typed_results = _typed_search_results(core, current_context, top_k=max_results)
+    output.extend(typed_results)
+
+    # Sort by score, deduplicate by content, take top N
+    output.sort(key=lambda x: x["score"], reverse=True)
+    seen = set()
+    deduped = []
+    for item in output:
+        key = item.get("content", "")[:100]
+        if key not in seen:
+            seen.add(key)
+            deduped.append(item)
+    return deduped[:max_results]
 
 
 @mcp.tool()
@@ -196,35 +225,40 @@ def get_intellectual_arc(
     """
     core = get_core()
 
-    # Search for positions related to this topic
-    results = core.memory.enhanced_hybrid_search(
-        topic, top_k=20, recursive_depth=1
-    )
+    # Search typed positions and tensions
+    pos_results = core.positions.search(topic, top_k=10)
+    ten_results = core.tensions.search(topic, top_k=5)
 
-    # Filter to positions and tensions, sort chronologically
     positions = []
-    tensions = []
-    for r in results:
-        meta = r["memory"].get("metadata", {})
-        entry = {
-            "content": r["memory"]["content"],
-            "timestamp": r["memory"].get("timestamp", ""),
-            "score": round(r["combined_score"], 3),
-        }
-        if meta.get("type") == "position":
-            entry["confidence"] = meta.get("confidence")
-            entry["context"] = meta.get("context")
-            positions.append(entry)
-        elif meta.get("type") == "tension":
-            entry["poles"] = meta.get("poles")
-            entry["status"] = meta.get("status")
-            tensions.append(entry)
-
-    # Sort chronologically
+    for r in pos_results:
+        p = r["item"]
+        positions.append({
+            "id": p.id,
+            "statement": p.statement,
+            "confidence": p.confidence,
+            "context": p.context,
+            "timestamp": p.timestamp,
+            "evolution": p.evolution,
+            "score": round(r["similarity"], 3),
+        })
     positions.sort(key=lambda x: x["timestamp"])
+
+    tensions = []
+    for r in ten_results:
+        t = r["item"]
+        tensions.append({
+            "id": t.id,
+            "poles": t.poles,
+            "description": t.description,
+            "status": t.status,
+            "timestamp": t.timestamp,
+            "engagement_count": len(t.engagement_history),
+            "score": round(r["similarity"], 3),
+        })
     tensions.sort(key=lambda x: x["timestamp"])
 
-    # Also include general memories that are highly relevant
+    # Also search general memories for context
+    memory_results = core.memory.enhanced_hybrid_search(topic, top_k=5, recursive_depth=1)
     general = [
         {
             "content": r["memory"]["content"],
@@ -232,9 +266,8 @@ def get_intellectual_arc(
             "categories": r["memory"].get("categories", []),
             "score": round(r["combined_score"], 3),
         }
-        for r in results
-        if r["memory"].get("metadata", {}).get("type") not in ("position", "tension", "precedent")
-        and r["combined_score"] > 0.3
+        for r in memory_results
+        if r["combined_score"] > 0.3
     ]
     general.sort(key=lambda x: x["timestamp"])
 
@@ -243,7 +276,7 @@ def get_intellectual_arc(
         "positions": positions,
         "tensions": tensions,
         "related_memories": general[:5],
-        "note": "v1: chronological ordering only. Arc detection (reinforcement/shift/reversal) coming in Phase 4."
+        "note": "v2: typed positions with evolution history. Arc detection (reinforcement/shift/reversal) coming in Phase 4."
     }
 
 
@@ -304,43 +337,44 @@ def check_precedent(
 ) -> list[dict]:
     """Look up whether the user has established relevant precedents.
 
-    Searches for positions they committed to previously, whether those
-    precedents held or broke, and implications for the current conversation.
+    Searches for precedents and committed positions. Returns whether
+    they held or broke under pressure, with test history.
     """
     core = get_core()
+    output = []
 
-    # Search specifically for precedents
-    results = core.memory.enhanced_hybrid_search(
-        context, top_k=10, recursive_depth=1
-    )
+    # Search typed precedents
+    for r in core.precedents.search(context, top_k=5):
+        p = r["item"]
+        output.append({
+            "id": p.id,
+            "statement": p.statement,
+            "held": p.held,
+            "context": p.context,
+            "timestamp": p.timestamp,
+            "test_history": p.test_history,
+            "dependencies": p.dependencies,
+            "relevance": round(r["similarity"], 3),
+            "source": "precedent",
+        })
 
-    precedents = []
-    for r in results:
-        meta = r["memory"].get("metadata", {})
-        if meta.get("type") == "precedent":
-            precedents.append({
-                "statement": r["memory"]["content"],
-                "held": meta.get("held", True),
-                "context": meta.get("context", ""),
-                "timestamp": r["memory"].get("timestamp", ""),
-                "relevance": round(r["combined_score"], 3),
-            })
-
-    # Also find committed positions (strong precedent-like)
-    for r in results:
-        meta = r["memory"].get("metadata", {})
-        if meta.get("type") == "position" and meta.get("confidence") == "committed":
-            precedents.append({
-                "statement": r["memory"]["content"],
+    # Also find committed positions (precedent-like)
+    for r in core.positions.search(context, top_k=5):
+        p = r["item"]
+        if p.confidence == "committed":
+            output.append({
+                "id": p.id,
+                "statement": p.statement,
                 "held": True,
-                "context": meta.get("context", ""),
-                "timestamp": r["memory"].get("timestamp", ""),
-                "relevance": round(r["combined_score"], 3),
+                "context": p.context,
+                "timestamp": p.timestamp,
+                "test_history": [],
+                "relevance": round(r["similarity"], 3),
                 "source": "committed_position",
             })
 
-    precedents.sort(key=lambda x: x["relevance"], reverse=True)
-    return precedents[:5]
+    output.sort(key=lambda x: x["relevance"], reverse=True)
+    return output[:5]
 
 
 @mcp.tool()
@@ -355,36 +389,49 @@ def assess_depth(
     """
     core = get_core()
 
-    # Search for what connects to this topic
-    results = core.memory.enhanced_hybrid_search(
-        current_topic, top_k=10, recursive_depth=1
-    )
+    # Count typed objects related to this topic
+    pos_results = core.positions.search(current_topic, top_k=5)
+    ten_results = core.tensions.search(current_topic, top_k=5)
+    prec_results = core.precedents.search(current_topic, top_k=5)
 
-    # Analyze what's available
+    types_found = {
+        "position": len(pos_results),
+        "tension": len(ten_results),
+        "precedent": len(prec_results),
+    }
+
+    # Collect categories across all typed results
     categories_touched = set()
-    types_found = {"position": 0, "tension": 0, "precedent": 0, "memory": 0}
+    for r in pos_results:
+        categories_touched.update(r["item"].categories)
+    for r in ten_results:
+        categories_touched.update(r["item"].categories)
+
+    # High relevance items
     high_relevance = []
+    for r in pos_results[:2]:
+        high_relevance.append({
+            "content": r["item"].statement[:100],
+            "type": "position",
+            "confidence": r["item"].confidence,
+            "score": round(r["similarity"], 3),
+        })
+    for r in ten_results[:2]:
+        high_relevance.append({
+            "content": r["item"].description[:100],
+            "type": "tension",
+            "poles": r["item"].poles,
+            "score": round(r["similarity"], 3),
+        })
 
-    for r in results:
-        categories_touched.update(r["memory"].get("categories", []))
-        mem_type = r["memory"].get("metadata", {}).get("type", "memory")
-        if mem_type in types_found:
-            types_found[mem_type] += 1
-        else:
-            types_found["memory"] += 1
-        if r["combined_score"] > 0.5:
-            high_relevance.append({
-                "content": r["memory"]["content"][:100],
-                "type": mem_type,
-                "score": round(r["combined_score"], 3),
-            })
+    # Check for active tensions
+    active_tensions = [r for r in ten_results if r["item"].status == "active"]
 
-    # Check if current exchange connects to known tensions
-    tension_connections = [
-        r for r in results
-        if r["memory"].get("metadata", {}).get("type") == "tension"
-        and r["combined_score"] > 0.3
-    ]
+    # Check recurring tensions
+    recurring = core.tensions.get_recurring(min_engagements=2)
+    recurring_nearby = [t for t in recurring if any(
+        r["item"].id == t.id for r in ten_results
+    )]
 
     has_deeper_structure = (
         types_found["position"] > 0 or
@@ -397,8 +444,9 @@ def assess_depth(
         "categories_connected": list(categories_touched),
         "intellectual_material": types_found,
         "has_deeper_structure": has_deeper_structure,
-        "active_tensions_nearby": len(tension_connections),
-        "highly_relevant_items": high_relevance[:3],
+        "active_tensions_nearby": len(active_tensions),
+        "recurring_tensions_nearby": len(recurring_nearby),
+        "highly_relevant_items": high_relevance,
         "suggestion": (
             "Deeper intellectual structure is available — positions, tensions, or precedents "
             "connect to this topic. Consider engaging with them."

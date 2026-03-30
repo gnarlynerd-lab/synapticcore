@@ -28,7 +28,8 @@ class JsonFileStore(StorageBackend):
 
     def load(self) -> Dict[str, Any]:
         if not os.path.exists(self.storage_path):
-            return {"memories": [], "categories": {}, "relationships": {}}
+            return {"memories": [], "categories": {}, "relationships": {},
+                    "positions": [], "tensions": [], "precedents": []}
         try:
             with open(self.storage_path, 'r') as f:
                 data = json.load(f)
@@ -36,11 +37,14 @@ class JsonFileStore(StorageBackend):
                 "memories": data.get("memories", []),
                 "categories": data.get("categories", {}),
                 "relationships": data.get("relationships", {}),
-                # Future: positions, tensions, precedents
+                "positions": data.get("positions", []),
+                "tensions": data.get("tensions", []),
+                "precedents": data.get("precedents", []),
             }
         except Exception as e:
             logger.error(f"Error loading data from {self.storage_path}: {e}")
-            return {"memories": [], "categories": {}, "relationships": {}}
+            return {"memories": [], "categories": {}, "relationships": {},
+                    "positions": [], "tensions": [], "precedents": []}
 
     def save(self, data: Dict[str, Any]) -> None:
         try:
