@@ -69,7 +69,7 @@ class MemorySystem:
             self._initialize_vector_index()
     
     def _initialize_vector_index(self):
-        """Initialize the vector index for similarity search."""
+        """Initialize the vector index for similarity search, loading from disk if available."""
         # Need a sample embedding to get dimensions
         if not self.memories:
             sample_text = "Sample text to determine embedding dimension."
@@ -81,23 +81,30 @@ class MemorySystem:
                 sample_embedding = self.embedding_model.encode(sample_memory["content"])
             else:
                 sample_embedding = self.embedding_model.encode("Sample text")
-        
+
         dim = len(sample_embedding)
-        
-        # Initialize HNSW index
+
+        # Try to load persisted index first
+        if self._load_index(dim):
+            return
+
+        # Build fresh index
         self.vector_index = hnswlib.Index(space='cosine', dim=dim)
-        self.vector_index.init_index(max_elements=max(1000, len(self.memories) * 2), 
+        self.vector_index.init_index(max_elements=max(1000, len(self.memories) * 2),
                                     ef_construction=200, M=16)
         self.vector_index.set_ef(50)  # For search
-        
+
         # Add existing memories to index
         count = 0
         for i, memory in enumerate(self.memories):
             if "embedding" in memory and memory["embedding"]:
                 self._add_to_index(i, memory["embedding"])
                 count += 1
-        
-        print(f"Added {count} memories to vector index")
+
+        print(f"Built vector index with {count} memories")
+
+        # Persist the newly built index
+        self._save_index()
 
     def _infer_categories_from_query(self, query):
         """Infer relevant categories from a query."""
@@ -124,17 +131,89 @@ class MemorySystem:
         self.memory_to_index[memory_id] = index_id
         self.index_to_memory[index_id] = memory_id
     
+    def _get_index_path(self):
+        """Get the path for the HNSW index file."""
+        base = self.storage_path.rsplit('.', 1)[0] if '.' in self.storage_path else self.storage_path
+        return base + '.hnsw'
+
+    def _get_index_mapping_path(self):
+        """Get the path for the index mapping file."""
+        base = self.storage_path.rsplit('.', 1)[0] if '.' in self.storage_path else self.storage_path
+        return base + '_index_mapping.json'
+
+    def _save_index(self):
+        """Save the HNSW index and ID mappings to disk."""
+        if not self.vector_index or self.vector_index.get_current_count() == 0:
+            return
+        try:
+            self.vector_index.save_index(self._get_index_path())
+            mapping_data = {
+                "memory_to_index": {str(k): v for k, v in self.memory_to_index.items()},
+                "index_to_memory": {str(k): v for k, v in self.index_to_memory.items()}
+            }
+            with open(self._get_index_mapping_path(), 'w') as f:
+                json.dump(mapping_data, f)
+        except Exception as e:
+            print(f"Error saving index: {e}")
+
+    def _load_index(self, dim):
+        """
+        Try to load a persisted HNSW index from disk.
+
+        Args:
+            dim: Embedding dimension
+
+        Returns:
+            True if index was loaded successfully, False otherwise
+        """
+        index_path = self._get_index_path()
+        mapping_path = self._get_index_mapping_path()
+
+        if not os.path.exists(index_path) or not os.path.exists(mapping_path):
+            return False
+
+        try:
+            # Load mapping first to get max_elements
+            with open(mapping_path, 'r') as f:
+                mapping_data = json.load(f)
+
+            memory_to_index = {int(k): v for k, v in mapping_data["memory_to_index"].items()}
+            index_to_memory = {int(k): v for k, v in mapping_data["index_to_memory"].items()}
+
+            # Validate mapping matches current memories count
+            if memory_to_index and max(memory_to_index.keys()) >= len(self.memories):
+                print("Index mapping outdated, will rebuild")
+                return False
+
+            # Load the HNSW index
+            max_elements = max(1000, len(self.memories) * 2)
+            self.vector_index = hnswlib.Index(space='cosine', dim=dim)
+            self.vector_index.load_index(index_path, max_elements=max_elements)
+            self.vector_index.set_ef(50)
+
+            self.memory_to_index = memory_to_index
+            self.index_to_memory = index_to_memory
+
+            print(f"Loaded HNSW index with {self.vector_index.get_current_count()} vectors")
+            return True
+        except Exception as e:
+            print(f"Error loading index, will rebuild: {e}")
+            self.vector_index = None
+            self.memory_to_index = {}
+            self.index_to_memory = {}
+            return False
+
     def _load_data(self):
         """Load memories and categories from storage."""
         if os.path.exists(self.storage_path):
             try:
                 with open(self.storage_path, 'r') as f:
                     data = json.load(f)
-                
+
                 self.memories = data.get("memories", [])
                 self.categories = data.get("categories", {})
                 self.relationships = data.get("relationships", {})
-                
+
                 print(f"Loaded {len(self.memories)} memories and {len(self.categories)} categories")
             except Exception as e:
                 print(f"Error loading data: {e}")
@@ -194,16 +273,17 @@ class MemorySystem:
         # Add to vector index if embedding was created
         if embedding and self.vector_index:
             self._add_to_index(memory_id, embedding)
-        
+            self._save_index()
+
         # Create any new categories that don't exist yet
         if categories:
             for category in categories:
                 if category not in self.categories:
                     self.add_category(category)
-        
+
         # Save data
         self._save_data()
-        
+
         return memory_id
     
     def add_category(self, name: str, description: str = "") -> bool:
