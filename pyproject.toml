@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synapticcore"
+version = "0.1.0"
+description = "Cognitive memory architecture for LLM agents"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    {name = "Gerard Lynn"}
+]
+
+dependencies = [
+    "sentence-transformers>=3.0",
+    "hnswlib>=0.8",
+    "numpy",
+    "requests",
+]
+
+[project.optional-dependencies]
+api = ["fastapi", "uvicorn"]
+mcp = ["mcp"]
+anthropic = ["anthropic"]
+openai = ["openai"]
+dev = ["pytest"]
+all = ["synapticcore[api,mcp,anthropic,openai,dev]"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
