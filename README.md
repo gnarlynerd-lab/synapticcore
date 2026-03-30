@@ -1,123 +1,209 @@
-SynapticCore
-An open-source cognitive architecture combining advanced memory systems with agent capabilities for intelligent knowledge management.
-Overview
-SynapticCore is a cognitive architecture that integrates a dual-embedding memory system with LLM-based agent capabilities. Inspired by neuroscience and cognitive psychology theories of memory formation, the system features sophisticated memory retrieval, automatic categorization, and self-improvement mechanisms that enable more effective knowledge management and retrieval.
-This project implements both semantic and episodic memory structures with associative retrieval patterns, mimicking how synaptic connections in the brain create networks of related information.
-Key Features
+# SynapticCore
 
-Enhanced Memory System: Dual embedding spaces for content and categories
-Sophisticated Retrieval: Hybrid search combining semantic, categorical, and associative patterns
-Memory Reflection: Feedback loops that improve organization over time
-Agent Integration: Proactive knowledge management with planning capabilities
-Self-Improvement: Automatic analysis and refinement of memory structures
-Web Interface: Interactive UI for knowledge exploration and management
+**Memory that understands what you decided, what's still open, and why it matters.**
 
-Current Status
-This project is under active development. Current components include:
+SynapticCore is an MCP server that gives AI agents structured memory of your decisions, tradeoffs, and constraints — not just facts. When your agent picks up where another left off, it inherits what was settled, what's still unresolved, and where the constraints came from. The result: agents that don't relitigate closed questions, know what's still open, and make better judgment calls on your behalf.
 
-Base memory system with embedding-based retrieval
-Enhanced memory system with dual embedding spaces
-Feedback mechanisms for memory quality improvement
-Integration with LLM APIs (currently supporting DeepSeek)
+## The problem
 
-We are currently implementing the agent framework that will enable more autonomous knowledge management.
-Getting Started
-Prerequisites
+Every AI memory system stores facts. "User likes Python." "Budget is $40K." "Prefers dark mode."
 
-Python 3.8+
-Sentence Transformers
-HNSWLib for vector indexing
-Access to an LLM API (DeepSeek or compatible)
+But that's not how people actually navigate decisions. You tried something and it didn't work. You committed to a direction after weighing tradeoffs. You settled a question, and that settlement constrains everything downstream. You keep circling back to the same unresolved tension.
 
-Installation:
-# Clone the repository
-git clone https://github.com/yourusername/synapticcore.git
-cd synapticcore
+Flat memory loses all of this. Your agent doesn't know *why* the budget is $40K, doesn't know the style question is still open, doesn't know you already ruled out the expensive option and why. So it asks again. Suggests things you've already rejected. Relitigates decisions you made weeks ago.
 
-# Install dependencies
-pip install -r requirements.txt
+SynapticCore tracks three things:
 
-# Set up environment variables
-export DEEPSEEK_API_KEY=your_api_key_here  # or another compatible LLM API
+- **Decisions** — what was settled, with confidence levels that evolve (tentative → held → committed)
+- **Tradeoffs** — unresolved tensions between competing priorities, with engagement history
+- **Constraints** — settled decisions that bind future choices, with records of whether they've held
 
-# Run the interactive system
-python chat_with_memory.py
+These connect to form a **decision landscape** — a structured map of what's settled, what's open, and what constrains what. When an agent queries SynapticCore, it gets back not just relevant memories but *structurally adjacent* context, retrieved through spreading activation across this landscape.
 
-Basic Usage:
-from simple_memory_system import MemorySystem
-from enhanced_memory_system import enhance_memory_system
-from memory_feedback_loop import MemoryFeedbackLoop
+## What it looks like
 
-# Initialize and enhance memory system
-memory_system = MemorySystem()
-memory_system = enhance_memory_system(memory_system)
+You're renovating your kitchen. Over three weeks, you talk to different agents about it.
 
-# Add some memories
-memory_system.add_memory(
-    "Python is a high-level programming language known for its readability.",
-    categories=["programming", "technology"]
+**Week 1** — You discuss style with a design agent.
+
+```python
+store_interaction(
+    decisions=[{
+        "statement": "Leaning toward modern minimalist",
+        "confidence": "tentative",
+        "context": "Initial preference, haven't seen options yet"
+    }],
+    tradeoffs=[{
+        "poles": ["Modern minimalist", "Farmhouse aesthetic"],
+        "description": "Haven't landed on a style direction",
+        "status": "active"
+    }]
 )
+```
 
-# Search memories
-results = memory_system.enhanced_hybrid_search("What programming language is readable?")
+**Week 2** — A different agent helps with budget. It reads SynapticCore and *knows the style is still unsettled*.
 
-Development Roadmap
-Phase 1: Core Agent Framework (In Progress)
+```python
+store_interaction(
+    decisions=[{
+        "statement": "Budget capped at $40K",
+        "confidence": "committed",
+        "context": "Contractor said moving plumbing adds $15K — decided to keep existing layout"
+    }],
+    constraints=[{
+        "statement": "$40K cap — set by the plumbing decision",
+        "held": True,
+        "context": "Keeping existing layout redirected $15K into finishes budget"
+    }]
+)
+```
 
-Agent architecture with reasoning loop
-Memory-agent interface
-Basic web UI
+**Week 3** — Your partner weighs in. The agent mediating that conversation inherits the full picture: budget is committed, style is still open, layout is a binding constraint.
 
-Phase 2: Agent Capabilities (Planned)
+**Week 4** — A shopping agent picks up. It queries SynapticCore with `depth="deep"` and gets back:
 
-Autonomous knowledge organization
-Interactive exploration patterns
-Self-improvement mechanisms
+- The $40K constraint (direct match)
+- The layout decision that established it (one hop)
+- The now-resolved style tradeoff (connected through the layout decision)
+- The partner's input that shifted the style (temporal chain with transition classification)
 
-Phase 3: Specialization (Planned)
+It doesn't suggest $50K countertops. It doesn't pull up pure minimalist options when the style shifted to transitional. It doesn't ask about the layout. It *knows*.
 
-Research assistant capabilities
-Enhanced visualization
-Evaluation framework
+## How it works
 
-Contributing
-Contributions are welcome! Please see our Contributing Guidelines for details on how to get involved.
-We're particularly interested in contributions in these areas:
+SynapticCore uses a **dual embedding architecture** with **spreading activation** for retrieval:
 
-Memory organization algorithms
-Agent planning mechanisms
-UI/UX improvements
-Documentation and examples
+```
+Query → Hybrid Search (semantic + categorical + recency + associative)
+           │
+           ▼ (depth="deep")
+       Spreading Activation
+       ├── Seeds from search results across all types
+       ├── Propagates through typed edges (decision↔tradeoff, decision↔constraint)
+       ├── Lateral inhibition keeps results focused
+       └── Returns nodes with activation paths explaining *how* it got there
+```
 
-Acknowledgments
+Phase 4 **decision narrative tracking** classifies how your thinking evolves:
 
-This project builds on research in cognitive architectures, memory systems, and language models
-Special thanks to contributors and early testers
+- **Reinforcement** — same direction, stronger ("even more sure about the layout")
+- **Shift** — related but reframed ("still keeping layout, but now it's about the floors, not plumbing cost")
+- **Reversal** — contradicts prior decision ("actually, tear out the wall")
 
-License
-This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
-Citation
-If you use SynapticCore in your research, please cite:
+Recurring tradeoffs that keep surfacing are flagged as **structural** — features of how you navigate decisions, not problems to solve.
 
-@software{synapticcore2025,
-    author = {Gerard Lynn},
-  title = {SynapticCore: A Cognitive Architecture with Dual-Embedding Memory Systems},
-  year = {2025},
-  url = {https://github.com/yourusername/synapticcore}
-  organization = {Integration Information Systems}
+## Installation
+
+```bash
+git clone https://github.com/gnarlynerd/synapticcore.git
+cd synapticcore
+python -m venv scagent_env
+source scagent_env/bin/activate
+pip install -r requirements.txt
+```
+
+### Run as MCP server
+
+Add to your Claude Desktop config (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "synapticcore": {
+      "command": "python",
+      "args": ["-m", "src.synapticcore.mcp.server"],
+      "cwd": "/path/to/synapticcore"
+    }
+  }
 }
+```
 
-Copyright 2024 Gerard Lynn
+Or run directly:
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+```bash
+python -m src.synapticcore.mcp.server
+```
 
-http://www.apache.org/licenses/LICENSE-2.0
+## MCP Tools
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+| Tool | What it does |
+|------|-------------|
+| `store_interaction` | Record decisions, tradeoffs, and constraints from a conversation |
+| `retrieve_relevant` | Get context from the decision landscape — surface, structural, or deep (with spreading activation) |
+| `get_decision_narrative` | Trace how your approach to a topic evolved, with transition classifications |
+| `find_adjacent` | Surface unexplored territory bordering the current conversation |
+| `check_constraints` | Find constraints that apply to the current situation |
+| `assess_depth` | Check whether there's deeper structure available for the current topic |
 
+## Architecture
+
+```
+src/synapticcore/
+  memory/       — base, enhanced, feedback, types, type_managers, arcs
+  retrieval/    — spreading activation network
+  mcp/          — FastMCP server + tool definitions
+  storage/      — JSON persistence
+  llm/          — configurable provider (DeepSeek, Anthropic, OpenAI)
+tests/          — core, types, activation, arcs, MCP integration
+```
+
+### Memory types
+
+- **Decisions** — statements with confidence levels (tentative/held/committed), context, evolution history, and links to related tradeoffs and constraints
+- **Tradeoffs** — opposing poles with engagement history. Recurring tradeoffs are structural features, not bugs.
+- **Constraints** — settled commitments with test history tracking whether they held or were violated
+
+### Retrieval depths
+
+- **`surface`** — semantic similarity only. Fast, conventional.
+- **`structural`** — adds typed search across decisions, tradeoffs, and constraints.
+- **`deep`** — spreading activation through the decision landscape. Returns results with activation paths showing how the system connected your query to each result. This is where SynapticCore is different from everything else.
+
+## What makes this different
+
+Every memory system in the current landscape — Mem0, Zep, Letta, LangMem, ChatGPT's memory, Claude's memory — stores facts and retrieves by similarity. SynapticCore tracks **how you navigate decisions over time** and retrieves through **structural adjacency in your decision landscape**.
+
+The difference matters when:
+
+- Multiple agents work on the same problem across sessions (handoff with cognitive state, not just task state)
+- A companion agent needs to understand patterns in how you make decisions, not just what you decided
+- Context from weeks ago is relevant not because it's semantically similar but because it *constrains* the current situation
+
+No existing system combines spreading activation, dual embeddings, decision narrative tracking, and typed memory objects. See `docs/competitive_landscape.md` for the full analysis.
+
+## Tech stack
+
+- Python 3.8+
+- Sentence Transformers (`all-MiniLM-L6-v2`)
+- HNSWLib for vector indexing
+- MCP Python SDK (FastMCP)
+- JSON file persistence (single-user, local by design)
+
+## Status
+
+All core phases complete and running as an MCP server. Currently in use as the memory substrate for the [Lexington Stack](docs/lexington_stack_synthesis.md) project.
+
+## Contributing
+
+Contributions welcome. Areas of particular interest:
+
+- Alternative storage backends (SQLite, PostgreSQL/pgvector)
+- Multi-user isolation
+- Additional MCP tool patterns
+- Integration examples with agent frameworks (OpenClaw, LangChain, CrewAI)
+- Benchmarking against other memory systems
+
+## License
+
+Apache License 2.0 — see LICENSE for details.
+
+## Citation
+
+```bibtex
+@software{synapticcore2025,
+  author = {Gerard Lynn},
+  title = {SynapticCore: Cognitive Memory Architecture for AI Agents},
+  year = {2025},
+  url = {https://github.com/gnarlynerd/synapticcore}
+}
+```

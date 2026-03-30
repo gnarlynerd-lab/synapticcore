@@ -2,103 +2,101 @@
 
 ## What Is This
 
-SynapticCore is a cognitive memory architecture for LLM agents. It combines dual-embedding spaces (semantic + categorical), associative retrieval with spreading activation, self-improving category evolution, and narrative tracking of intellectual development. The core idea: treat users as evolving intellectual agents, not preference profiles.
+A cognitive memory architecture exposed as an MCP server. It tracks how a user's thinking evolves — decisions held and revised, recurring tradeoffs, binding constraints — not atomic facts. The core differentiator: memory as topology, not database.
 
-A thorough competitive analysis (in `docs/`) found no existing system that combines all of these — spreading activation + dual embeddings + self-improvement + intellectual arc tracking. Estimated strategic window: 12–18 months before convergence.
+Competitive analysis (`docs/`) found no existing system combining spreading activation + dual embeddings + self-improvement + intellectual arc tracking. Estimated strategic window: 12–18 months before convergence.
+
+## Current State: Phase 5 Complete (2026-03-30)
+
+All 6 MCP tools are implemented and the system is live.
+
+| Phase | Commit | What landed |
+|-------|--------|-------------|
+| **0** | `97d9574` | HNSW persistence, LLM provider abstraction, core tests |
+| **1** | `e3ee917` | Refactor into `src/synapticcore/` package |
+| **2** | `adce977` | MCP server with 6 cognitive memory tools |
+| **3** | `869f31d` | First-class memory types — decisions, tradeoffs, constraints |
+| **4** | `cf1e1cd` | Intellectual arc tracking |
+| **5** | `cb04ee2` | Spreading activation for topology-aware retrieval |
+| — | `eafeb63` | Spec amendment: reframe as user narrative memory |
+| — | `60a5525` | Fix numpy float32 serialization in retrieve_relevant |
+
+## MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `store_interaction` | Record decisions, tradeoffs, constraints from conversations |
+| `retrieve_relevant` | Hybrid search with optional spreading activation (surface/structural/deep) |
+| `get_decision_narrative` | Trace how the user's approach to a topic evolved over time |
+| `find_adjacent` | Surface unexplored territory bordering the current conversation |
+| `check_constraints` | Find constraints that should apply to the current situation |
+| `assess_depth` | Evaluate whether deeper intellectual structure is available |
+
+## Architecture
+
+```
+src/synapticcore/
+  memory/       — base, enhanced, feedback, types, type_managers, arcs
+  retrieval/    — spreading activation network
+  mcp/          — FastMCP server + tool definitions
+  storage/      — JSON store, storage interface
+  llm/          — configurable provider (DeepSeek, Anthropic, OpenAI)
+tests/          — core, types, activation, arcs, MCP tools
+```
+
+### Retrieval pipeline
+
+```
+Query
+  │
+  ▼
+Hybrid Search (4-phase)
+  ├── Phase 1: Semantic similarity (HNSW KNN)
+  ├── Phase 2: Category matching
+  ├── Phase 3: Recency boost (exponential decay)
+  └── Phase 4: Associative expansion
+          │
+          ▼ (depth="deep")
+  Spreading Activation
+  ├── Seed from semantic search across all types
+  ├── Propagate through adjacency graph (typed edges)
+  ├── Lateral inhibition for diversity
+  └── Return activated nodes with paths
+```
+
+### Memory types
+
+- **Decisions** (née positions) — statements with confidence, context, evolution history
+- **Tradeoffs** (née tensions) — opposing poles with engagement history
+- **Constraints** (née precedents) — commitments with test history tracking whether they held
+
+Old internal prefixes (`pos:`, `ten:`, `pre:`) still used in activation graph IDs; mapped to user-facing vocabulary in MCP output.
 
 ## Tech Stack
 
 - **Python 3.8+** with venv at `scagent_env/`
 - **Sentence Transformers** (`all-MiniLM-L6-v2`) for embeddings
-- **HNSWLib** for vector indexing / approximate nearest neighbor search
-- **FastAPI + Uvicorn** for the REST API
-- **DeepSeek API** for LLM generation (requires `DEEPSEEK_API_KEY`)
-- **JSON files** for persistence (memory stores, feedback history, conversations)
+- **HNSWLib** for vector indexing
+- **MCP Python SDK** (`mcp`) — FastMCP server
+- **FastAPI + Uvicorn** — legacy REST API, kept as debug tool
+- **JSON files** for persistence
+- **pytest** for tests
 
-## File Map
+## Known Issues / Cleanup
 
-| File | Role |
-|------|------|
-| `simple_memory_system.py` | Base memory: embeddings, HNSW indexing, semantic/hybrid search, category management with versioning |
-| `enhanced_memory_system.py` | Dual-embedding layer: category embeddings, similarity scoring, outlier detection, relationship discovery |
-| `memory_feedback_loop.py` | Self-improvement: search tracking, quality metrics, category evolution suggestions, auto-refinement |
-| `narrative_memory_system.py` | Narrative points, intellectual arc tracking, temporal organization, narrative search |
-| `chat_with_memory.py` | Interactive CLI integrating all systems with DeepSeek LLM |
-| `memory_system_api.py` | FastAPI REST API exposing all memory operations |
-| `memory.html` | Basic web UI visualization |
-| `docs/compass_artifact_wf-*.md` | Competitive analysis (30+ products, 15+ papers, patent landscape) |
+- Internal ID prefixes (`pos:`, `ten:`, `pre:`) don't match external vocabulary (`decision`, `tradeoff`, `constraint`)
+- LLM provider wired up but needs valid API key to function (DeepSeek 401s without one)
+- No multi-user isolation (single-user, local — by design for MVP)
+- JSON storage caps out around 10K memories practically
 
-## What's Working
+## Legacy Files
 
-- **Core memory system** — full CRUD, UUID-based, JSON persistence
-- **Semantic search** — sentence-transformer embeddings + HNSW KNN queries
-- **Hybrid search** — 4-phase retrieval: semantic similarity, category matching, recency boost (exponential decay), associative expansion (spreading activation)
-- **Category management** — dynamic creation, version history, deprecation workflow, relationship mapping
-- **Dual embeddings** — category-level aggregated embeddings, cross-category similarity, outlier detection, new category suggestions via clustering
-- **Feedback loop** — search pattern tracking, failed search logging, category coherence metrics, improvement suggestions (merge/split/rename/create), auto-apply
-- **Narrative system** — narrative creation from memories, confidence-scored points, temporal ordering, narrative search
-- **API layer** — full FastAPI endpoints for all operations
-- **CLI chat** — interactive mode with `!search`, `!feedback`, `!metrics` commands
-
-## What's Partial or Broken
-
-- **LLM integration** — DeepSeek API calls are wired up but stored data shows 401 auth errors. Requires a valid `DEEPSEEK_API_KEY` to function.
-- **Narrative generation** — structure is in place but LLM-driven synthesis is incomplete
-- **Web UI** — `memory.html` exists but is minimal
-
-## What Doesn't Exist Yet
-
-- **Agent framework** — README says Phase 1 "in progress" but no agent reasoning loop, planning, or autonomous behavior is implemented
-- **Tests** — zero test files
-- **Scalable storage** — everything is single-file JSON; no database backend
-- **Vector index persistence** — HNSW index rebuilds from scratch on every startup
-- **Multi-user isolation** — none
-
-## Data
-
-Several JSON stores exist with real data:
-- `memory_store.json` (~623 KB, ~19K lines) — primary store
-- `memory_store_v3.json` (~203 KB) — versioned store
-- `enhanced_memory.json` (~72 KB) — dual-embedding data
-- `conversation_memory.json` (~43 KB) — chat history
-- `feedback_history.json` (~14 KB) — metrics/feedback
-
-## Architecture at a Glance
-
-```
-User Input (Chat / API)
-    │
-    ▼
-Memory System ──→ Embedding Model ──→ Vector Index (HNSW)
-    │                                       │
-    ├── Category Manager (versioned)        │
-    │                                       │
-    ▼                                       ▼
-Hybrid Search ◄────────────────────────────┘
-    ├── Phase 1: Semantic similarity (KNN)
-    ├── Phase 2: Category matching
-    ├── Phase 3: Recency boost (exp decay)
-    └── Phase 4: Associative expansion (spreading activation)
-            │
-            ▼
-    Feedback Loop ──→ Metrics ──→ Suggestions ──→ Auto-refinement
-            │
-            ▼
-    Narrative Layer ──→ Intellectual arc tracking
-```
-
-## README Roadmap (as stated)
-
-| Phase | Focus | Status |
-|-------|-------|--------|
-| **1** | Core agent framework, memory-agent interface, basic web UI | Stated "in progress" — memory is solid, agent loop not started |
-| **2** | Autonomous knowledge organization, interactive exploration, self-improvement | Not started |
-| **3** | Research assistant, enhanced visualization, evaluation framework | Not started |
-
-## Biggest Gaps to Close Next
-
-1. **Fix LLM integration** — get DeepSeek auth working (or swap to another provider) so chat, narrative generation, and LLM-driven suggestions actually function
-2. **Add tests** — nothing is tested; the core search and category logic is complex enough to warrant it
-3. **Start the agent loop** — the memory system is the foundation, but the agent reasoning/planning layer is the product
-4. **Persist the HNSW index** — rebuilding on every startup won't scale
-5. **Consider a real database** — JSON files cap out around 10K memories practically
+| File | Role | Status |
+|------|------|--------|
+| `simple_memory_system.py` | Original base memory system | Superseded by `src/synapticcore/memory/base.py` |
+| `enhanced_memory_system.py` | Original dual-embedding layer | Superseded by `src/synapticcore/memory/enhanced.py` |
+| `narrative_memory_system.py` | Original narrative tracking | Superseded by `src/synapticcore/memory/arcs.py` |
+| `memory_feedback_loop.py` | Original feedback loop | Superseded by `src/synapticcore/memory/feedback.py` |
+| `memory_system_api.py` | FastAPI REST API | Kept as debug tool |
+| `chat_with_memory.py` | CLI chat interface | Kept but not the product |
+| `memory.html` | Minimal web UI | Kept but not the product |
