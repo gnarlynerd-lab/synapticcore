@@ -5,7 +5,26 @@ Exposes cognitive memory tools via the Model Context Protocol.
 Run with: python -m synapticcore.mcp.server
 """
 
+import logging
 import os
+import sys
+
+# Route all logging to stderr so stdout stays clean for MCP JSON protocol
+logging.basicConfig(
+    stream=sys.stderr,
+    level=logging.WARNING,
+    format="%(name)s: %(message)s",
+)
+# Suppress noisy libraries
+logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("httpx").setLevel(logging.ERROR)
+logging.getLogger("httpcore").setLevel(logging.ERROR)
+
+# Suppress HuggingFace progress bars
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+
 from mcp.server.fastmcp import FastMCP
 
 from .. import SynapticCore

@@ -6,11 +6,14 @@ instead of direct file I/O, and delegates search to HybridSearchEngine.
 """
 
 from datetime import datetime
+import logging
 import numpy as np
 import uuid
 import random
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -54,7 +57,7 @@ class MemorySystem:
             try:
                 self.embedding_model = SentenceTransformer(embedding_model)
             except Exception as e:
-                print(f"Error loading embedding model: {e}")
+                logger.error(f"Error loading embedding model: {e}")
 
         # Load existing data
         self._load_data()
@@ -71,7 +74,7 @@ class MemorySystem:
         self.categories = data.get("categories", {})
         self.relationships = data.get("relationships", {})
         if self.memories:
-            print(f"Loaded {len(self.memories)} memories and {len(self.categories)} categories")
+            logger.info(f"Loaded {len(self.memories)} memories and {len(self.categories)} categories")
 
     def _save_data(self):
         self.storage.save({
@@ -102,7 +105,7 @@ class MemorySystem:
                 self.vector_index = index
                 self.memory_to_index = mem_to_idx
                 self.index_to_memory = idx_to_mem
-                print(f"Loaded HNSW index with {self.vector_index.get_current_count()} vectors")
+                logger.info(f"Loaded HNSW index with {self.vector_index.get_current_count()} vectors")
                 return
 
         # Build fresh index
@@ -119,7 +122,7 @@ class MemorySystem:
                 self._add_to_index(i, memory["embedding"])
                 count += 1
 
-        print(f"Built vector index with {count} memories")
+        logger.info(f"Built vector index with {count} memories")
         self.storage.save_index(self.vector_index, self.memory_to_index, self.index_to_memory)
 
     def _add_to_index(self, memory_id: int, embedding):
@@ -146,7 +149,7 @@ class MemorySystem:
             try:
                 embedding = self.embedding_model.encode(content).tolist()
             except Exception as e:
-                print(f"Error creating embedding: {e}")
+                logger.error(f"Error creating embedding: {e}")
 
         memory = {
             "id": str(uuid.uuid4()),
@@ -646,7 +649,7 @@ class MemorySystem:
                 suggestions = _json.loads(json_match.group(1))
                 self._process_category_suggestions(suggestions)
         except Exception as e:
-            print(f"Error in periodic review: {e}")
+            logger.error(f"Error in periodic review: {e}")
 
     def _process_category_suggestions(self, suggestions):
         for name, description in suggestions.get("new_categories", {}).items():

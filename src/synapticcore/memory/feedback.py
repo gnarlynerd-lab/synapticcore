@@ -6,11 +6,14 @@ as composed references instead of expecting monkey-patched methods.
 """
 
 import json
+import logging
 import os
 import time
 from datetime import datetime
 from typing import List, Dict, Optional
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryFeedbackLoop:
@@ -50,7 +53,7 @@ class MemoryFeedbackLoop:
                 with open(self.feedback_log_path, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                print(f"Error loading feedback history: {e}")
+                logger.error(f"Error loading feedback history: {e}")
         return {"feedback_events": [], "metrics_history": []}
 
     def _save_feedback_history(self):
@@ -59,7 +62,7 @@ class MemoryFeedbackLoop:
             with open(self.feedback_log_path, 'w') as f:
                 json.dump(self.feedback_history, f, indent=2)
         except Exception as e:
-            print(f"Error saving feedback history: {e}")
+            logger.error(f"Error saving feedback history: {e}")
 
     def chatbot_memory_search(self, query: str, categories: List[str] = None,
                               result_count: int = 3, use_enhanced_search: bool = False) -> Dict:

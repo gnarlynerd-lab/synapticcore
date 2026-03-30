@@ -1,10 +1,13 @@
 """JSON file storage backend."""
 
 import json
+import logging
 import os
 from typing import Any, Dict, Optional, Tuple
 
 from .base import StorageBackend
+
+logger = logging.getLogger(__name__)
 
 
 class JsonFileStore(StorageBackend):
@@ -36,7 +39,7 @@ class JsonFileStore(StorageBackend):
                 # Future: positions, tensions, precedents
             }
         except Exception as e:
-            print(f"Error loading data from {self.storage_path}: {e}")
+            logger.error(f"Error loading data from {self.storage_path}: {e}")
             return {"memories": [], "categories": {}, "relationships": {}}
 
     def save(self, data: Dict[str, Any]) -> None:
@@ -45,7 +48,7 @@ class JsonFileStore(StorageBackend):
             with open(self.storage_path, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            print(f"Error saving data: {e}")
+            logger.error(f"Error saving data: {e}")
 
     def load_index(self, dim: int) -> Optional[Tuple[Any, Dict, Dict]]:
         if not os.path.exists(self._index_path) or not os.path.exists(self._mapping_path):
@@ -67,7 +70,7 @@ class JsonFileStore(StorageBackend):
 
             return index, memory_to_index, index_to_memory
         except Exception as e:
-            print(f"Error loading index, will rebuild: {e}")
+            logger.warning(f"Error loading index, will rebuild: {e}")
             return None
 
     def save_index(self, index: Any, memory_to_index: Dict, index_to_memory: Dict) -> None:
@@ -82,4 +85,4 @@ class JsonFileStore(StorageBackend):
             with open(self._mapping_path, 'w') as f:
                 json.dump(mapping_data, f)
         except Exception as e:
-            print(f"Error saving index: {e}")
+            logger.error(f"Error saving index: {e}")
