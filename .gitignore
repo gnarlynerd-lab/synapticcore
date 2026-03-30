@@ -1,3 +1,6 @@
+# HNSW index files
+*.hnsw
+
 # SynapticCore specific files
 *_store.json
 memory_store.json
