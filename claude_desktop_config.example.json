@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "synapticcore": {
+      "command": "/Users/gerardlynn/aaaprojects/chasedreams/synapticcore/scagent_env/bin/python",
+      "args": ["-m", "synapticcore.mcp"],
+      "env": {
+        "SYNAPTICCORE_STORAGE": "/Users/gerardlynn/aaaprojects/chasedreams/synapticcore/memory_store.json"
+      }
+    }
+  }
+}
