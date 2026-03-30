@@ -10,6 +10,7 @@ from .memory.feedback import MemoryFeedbackLoop
 from .memory.types import Position, Tension, Precedent
 from .memory.type_managers import PositionManager, TensionManager, PrecedentManager
 from .memory.arcs import ArcTracker
+from .retrieval.activation import SpreadingActivationNetwork, ActivationConfig
 from .storage.json_store import JsonFileStore
 from .llm.provider import LLMProvider, create_provider
 
@@ -44,6 +45,11 @@ class SynapticCore:
 
         # Arc tracking
         self.arcs = ArcTracker(self.positions, self.tensions)
+
+        # Spreading activation
+        self.activation = SpreadingActivationNetwork(
+            self.memory, self.positions, self.tensions, self.precedents
+        )
 
         # Load typed data from storage
         self._load_types()

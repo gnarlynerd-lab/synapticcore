@@ -177,13 +177,14 @@ class TestFindAdjacent:
             positions=[{"statement": "Functional programming reduces bugs", "confidence": "held", "context": "code quality"}]
         )
         result = find_adjacent("functional programming")
-        assert "current_territory" in result
-        assert "adjacent_categories" in result
-        assert "unexplored_clusters" in result
+        assert "explored" in result
+        assert "adjacent" in result
+        assert "gap_tensions" in result
 
     def test_find_adjacent_empty(self):
         result = find_adjacent("anything")
-        assert isinstance(result["current_territory"], list)
+        assert isinstance(result["explored"], list)
+        assert isinstance(result["adjacent"], list)
 
 
 # ─── check_precedent ───────────────────────────────────────────────────

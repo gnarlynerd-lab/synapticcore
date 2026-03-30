@@ -182,20 +182,45 @@ def retrieve_relevant(
 ) -> list[dict]:
     """Retrieve intellectually relevant material from the user's history.
 
-    Returns not just semantically similar content but associatively related material.
-    Searches both generic memories and typed objects (positions, tensions, precedents).
+    Returns not just semantically similar content but structurally adjacent
+    material — things connected through the intellectual topology, not just
+    embedding similarity.
 
     Args:
         current_context: What the user is currently exploring.
-        depth: "surface" (semantic only), "structural" (+ categories), "deep" (+ associative expansion).
+        depth: "surface" (semantic only), "structural" (+ typed search),
+               "deep" (+ spreading activation through topology).
         max_results: Maximum results to return.
     """
     core = get_core()
 
-    depth_to_recursive = {"surface": 0, "structural": 1, "deep": 2}
+    if depth == "deep":
+        # Use spreading activation for deep retrieval
+        from ..retrieval.activation import ActivationConfig
+        config = ActivationConfig(max_hops=3, decay_rate=0.5)
+        nodes = core.activation.activate([current_context], config)
+
+        output = []
+        for node in nodes:
+            if node.node_type == "category":
+                continue  # Skip category nodes in output
+            entry = {
+                "content": node.content[:300],
+                "type": node.node_type,
+                "score": round(node.activation, 3),
+                "retrieval_method": f"activation_depth_{node.depth}",
+                "activation_path": [p.split(":", 1)[-1][:12] for p in node.path],
+                "timestamp": node.metadata.get("timestamp", ""),
+            }
+            entry.update({k: v for k, v in node.metadata.items()
+                          if k not in ("timestamp",)})
+            output.append(entry)
+        return output[:max_results]
+
+    # Surface and structural: semantic + typed search
+    depth_to_recursive = {"surface": 0, "structural": 1}
     recursive_depth = depth_to_recursive.get(depth, 1)
 
-    # Search generic memories
     memory_results = core.memory.enhanced_hybrid_search(
         current_context, top_k=max_results, recursive_depth=recursive_depth,
     )
@@ -211,11 +236,9 @@ def retrieve_relevant(
             "timestamp": memory.get("timestamp", ""),
         })
 
-    # Search typed objects
     typed_results = _typed_search_results(core, current_context, top_k=max_results)
     output.extend(typed_results)
 
-    # Sort by score, deduplicate by content, take top N
     output.sort(key=lambda x: x["score"], reverse=True)
     seen = set()
     deduped = []
@@ -252,49 +275,12 @@ def find_adjacent(
 ) -> dict:
     """Identify unexplored territory bordering the user's intellectual topology.
 
-    Finds tensions that haven't been explored, categories that connect to
-    the current conversation but haven't been tested, and gaps in the topology.
+    Uses spreading activation to find weakly-activated-but-reachable nodes —
+    territory that is structurally close to your current thinking but hasn't
+    been explored. Returns the frontier of your intellectual topology.
     """
     core = get_core()
-
-    # Get what's directly relevant
-    direct_results = core.memory.enhanced_hybrid_search(
-        current_context, top_k=5, recursive_depth=2
-    )
-
-    # Get categories touched by direct results
-    touched_categories = set()
-    for r in direct_results:
-        touched_categories.update(r["memory"].get("categories", []))
-
-    # Find related categories through the relationship graph
-    related_categories = []
-    if core.enhanced:
-        rels = core.enhanced.discover_category_relationships(min_similarity=0.4)
-        for rel in rels:
-            if rel["source"] in touched_categories and rel["target"] not in touched_categories:
-                related_categories.append({"category": rel["target"], "similarity": round(rel["similarity"], 3),
-                                            "connected_via": rel["source"]})
-            elif rel["target"] in touched_categories and rel["source"] not in touched_categories:
-                related_categories.append({"category": rel["source"], "similarity": round(rel["similarity"], 3),
-                                            "connected_via": rel["target"]})
-
-    # Find uncategorized clusters that might be adjacent
-    new_category_suggestions = []
-    if core.enhanced:
-        clusters = core.enhanced.suggest_new_categories(min_memories=2, similarity_threshold=0.5)
-        for cluster in clusters:
-            new_category_suggestions.append({
-                "size": cluster["size"],
-                "sample_texts": cluster["sample_texts"],
-            })
-
-    return {
-        "current_territory": list(touched_categories),
-        "adjacent_categories": related_categories[:5],
-        "unexplored_clusters": new_category_suggestions[:3],
-        "note": "v1: category-based adjacency. Topology-aware adjacency coming in Phase 5."
-    }
+    return core.activation.find_adjacent_territory(current_context)
 
 
 @mcp.tool()
