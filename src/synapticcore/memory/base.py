@@ -291,7 +291,7 @@ class MemorySystem:
 
         results = []
         for idx, dist in zip(labels[0], distances[0]):
-            similarity = 1.0 - dist
+            similarity = float(1.0 - dist)
             memory_id = self.index_to_memory.get(int(idx))
             if memory_id is None:
                 continue
