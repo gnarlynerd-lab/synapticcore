@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory System Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js for visualizations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <!-- Chart.js for stats -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-indigo-600 text-white p-4">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-2xl font-bold">Memory System Dashboard</h1>
+                <div class="flex items-center space-x-4">
+                    <span id="memory-count" class="px-3 py-1 bg-indigo-800 rounded-full text-sm">0 Memories</span>
+                    <span id="category-count" class="px-3 py-1 bg-indigo-800 rounded-full text-sm">0 Categories</span>
+                    <span id="narrative-count" class="px-3 py-1 bg-indigo-800 rounded-full text-sm">0 Narratives</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow container mx-auto p-4">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                <!-- Sidebar Navigation -->
+                <div class="md:col-span-3 lg:col-span-2 bg-white p-4 rounded-lg shadow">
+                    <nav>
+                        <ul class="space-y-2">
+                            <li>
+                                <button data-section="dashboard" class="nav-btn w-full text-left px-4 py-2 rounded transition hover:bg-indigo-100 bg-indigo-200">Dashboard</button>
+                            </li>
+                            <li>
+                                <button data-section="memories" class="nav-btn w-full text-left px-4 py-2 rounded transition hover:bg-indigo-100">Memories</button>
+                            </li>
+                            <li>
+                                <button data-section="categories" class="nav-btn w-full text-left px-4 py-2 rounded transition hover:bg-indigo-100">Categories</button>
+                            </li>
+                            <li>
+                                <button data-section="narratives" class="nav-btn w-full text-left px-4 py-2 rounded transition hover:bg-indigo-100">Narratives</button>
+                            </li>
+                            <li>
+                                <button data-section="search" class="nav-btn w-full text-left px-4 py-2 rounded transition hover:bg-indigo-100">Search</button>
+                            </li>
+                            <li>
+                                <button data-section="visualizations" class="nav-btn w-full text-left px-4 py-2 rounded transition hover:bg-indigo-100">Visualizations</button>
+                            </li>
+                            <li>
+                                <button data-section="feedback" class="nav-btn w-full text-left px-4 py-2 rounded transition hover:bg-indigo-100">Feedback Loop</button>
+                            </li>
+                            <li>
+                                <button data-section="consciousness" class="nav-btn w-full text-left px-4 py-2 rounded transition hover:bg-indigo-100">Consciousness Metrics</button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+
+                <!-- Content Area -->
+                <div class="md:col-span-9 lg:col-span-10 space-y-4">
+                    <!-- Dashboard Section -->
+                    <section id="dashboard-section" class="section-content">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                            <!-- Memory Stats Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-2">Memory Stats</h3>
+                                <div class="flex justify-between items-center">
+                                    <div class="text-3xl font-bold text-indigo-600" id="memory-total">0</div>
+                                    <div class="text-gray-500">Total Memories</div>
+                                </div>
+                                <div class="mt-2 text-sm text-gray-500">
+                                    <span id="categorized-percent">0%</span> categorized
+                                </div>
+                            </div>
+                            
+                            <!-- Category Stats Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-2">Categories</h3>
+                                <div class="flex justify-between items-center">
+                                    <div class="text-3xl font-bold text-indigo-600" id="category-total">0</div>
+                                    <div class="text-gray-500">Active Categories</div>
+                                </div>
+                                <div class="mt-2 text-sm text-gray-500">
+                                    <span id="avg-category-version">1.0</span> avg version
+                                </div>
+                            </div>
+                            
+                            <!-- Narrative Stats Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-2">Narratives</h3>
+                                <div class="flex justify-between items-center">
+                                    <div class="text-3xl font-bold text-indigo-600" id="narrative-total">0</div>
+                                    <div class="text-gray-500">Total Narratives</div>
+                                </div>
+                                <div class="mt-2 text-sm text-gray-500">
+                                    <span id="avg-narrative-points">0</span> avg points per narrative
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <!-- Memory Timeline Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Memory Growth Over Time</h3>
+                                <canvas id="memory-timeline-chart" height="200"></canvas>
+                            </div>
+
+                            <!-- Category Distribution Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Top Categories</h3>
+                                <canvas id="category-distribution-chart" height="200"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent Memories -->
+                        <div class="bg-white p-4 rounded-lg shadow mt-4">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold">Recent Memories</h3>
+                                <button class="text-sm px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700" id="add-memory-btn">
+                                    Add Memory
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full table-auto">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">ID</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Content</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Categories</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recent-memories-list" class="divide-y divide-gray-200">
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-4 text-center text-gray-500">Loading memories...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Memories Section -->
+                    <section id="memories-section" class="section-content hidden">
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-bold">Memories</h2>
+                                <div class="flex space-x-2">
+                                    <select id="memory-category-filter" class="border rounded px-2 py-1 text-sm">
+                                        <option value="">All Categories</option>
+                                    </select>
+                                    <button class="text-sm px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700" id="add-memory-btn-2">
+                                        Add Memory
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full table-auto">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">ID</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Content</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Categories</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Timestamp</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="memories-list" class="divide-y divide-gray-200">
+                                        <tr>
+                                            <td colspan="5" class="px-4 py-4 text-center text-gray-500">Loading memories...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="mt-4 flex justify-between">
+                                <div>
+                                    <span id="memory-pagination-info" class="text-sm text-gray-500">Showing 1-10 of 0</span>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button id="memory-prev-page" class="px-3 py-1 border rounded text-sm disabled:opacity-50">Previous</button>
+                                    <button id="memory-next-page" class="px-3 py-1 border rounded text-sm disabled:opacity-50">Next</button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Categories Section -->
+                    <section id="categories-section" class="section-content hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <!-- Add Category Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Add Category</h3>
+                                <form id="add-category-form">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                                        <input type="text" id="category-name" class="w-full p-2 border rounded" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                        <textarea id="category-description" class="w-full p-2 border rounded" rows="3"></textarea>
+                                    </div>
+                                    <button type="submit" class="w-full py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                        Add Category
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <!-- Add Relationship Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Add Relationship</h3>
+                                <form id="add-relationship-form">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Source Category</label>
+                                        <select id="relationship-source" class="w-full p-2 border rounded" required>
+                                            <option value="">Select Source</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Relationship Type</label>
+                                        <input type="text" id="relationship-type" class="w-full p-2 border rounded" required placeholder="e.g., includes, contradicts">
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Target Category</label>
+                                        <select id="relationship-target" class="w-full p-2 border rounded" required>
+                                            <option value="">Select Target</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="w-full py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                        Add Relationship
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <!-- Category Evolution Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Category Evolution</h3>
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Select Category</label>
+                                    <select id="evolution-category" class="w-full p-2 border rounded">
+                                        <option value="">Select Category</option>
+                                    </select>
+                                </div>
+                                <div id="category-evolution-details" class="text-sm text-gray-600 mt-4">
+                                    <p class="text-center text-gray-500">Select a category to view evolution</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Categories List -->
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">All Categories</h3>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full table-auto">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Name</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Description</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Version</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Status</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Memory Count</th>
+                                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-600">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="categories-list" class="divide-y divide-gray-200">
+                                        <tr>
+                                            <td colspan="6" class="px-4 py-4 text-center text-gray-500">Loading categories...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Narratives Section -->
+                    <section id="narratives-section" class="section-content hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <!-- Create Narrative Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Create Narrative</h3>
+                                <form id="create-narrative-form">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                                        <input type="text" id="narrative-title" class="w-full p-2 border rounded" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                        <textarea id="narrative-description" class="w-full p-2 border rounded" rows="3"></textarea>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Categories</label>
+                                        <select id="narrative-categories" class="w-full p-2 border rounded" multiple>
+                                        </select>
+                                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                    </div>
+                                    <button type="submit" class="w-full py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                        Create Narrative
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <!-- Generate Narrative Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Generate from Memories</h3>
+                                <form id="generate-narrative-form">
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Memory IDs</label>
+                                        <input type="text" id="narrative-memory-ids" class="w-full p-2 border rounded" required placeholder="Comma-separated memory IDs, e.g., 0,1,3">
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Title (Optional)</label>
+                                        <input type="text" id="generate-narrative-title" class="w-full p-2 border rounded">
+                                    </div>
+                                    <p class="text-xs text-gray-500 mb-4">If no title is provided, one will be generated based on the memories.</p>
+                                    <button type="submit" class="w-full py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                        Generate Narrative
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <!-- Narratives List -->
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold">All Narratives</h3>
+                                <select id="narrative-category-filter" class="border rounded px-2 py-1 text-sm">
+                                    <option value="">All Categories</option>
+                                </select>
+                            </div>
+                            <div id="narratives-list" class="divide-y divide-gray-200">
+                                <p class="text-center text-gray-500 py-4">Loading narratives...</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Search Section -->
+                    <section id="search-section" class="section-content hidden">
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">Memory Search</h3>
+                            <form id="memory-search-form" class="mb-4">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Search Query</label>
+                                        <input type="text" id="search-query" class="w-full p-2 border rounded" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Max Results</label>
+                                        <input type="number" id="search-top-k" class="w-full p-2 border rounded" value="5" min="1" max="20">
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Categories</label>
+                                        <select id="search-categories" class="w-full p-2 border rounded" multiple>
+                                        </select>
+                                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Semantic Weight</label>
+                                        <input type="range" id="search-semantic-weight" class="w-full" min="0" max="1" step="0.1" value="0.5">
+                                        <div class="flex justify-between text-xs text-gray-500">
+                                            <span>Category</span>
+                                            <span id="semantic-weight-value">0.5</span>
+                                            <span>Semantic</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-end">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox" id="search-enhanced" class="form-checkbox" checked>
+                                            <span class="ml-2">Use enhanced search</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="mt-4 py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                    Search
+                                </button>
+                            </form>
+                            
+                            <div id="search-results" class="mt-6 hidden">
+                                <h4 class="font-medium mb-2">Search Results</h4>
+                                <div id="narrative-context" class="mb-4 p-3 bg-indigo-50 rounded-lg hidden">
+                                    <h5 class="font-medium text-indigo-800 mb-1">Narrative Context</h5>
+                                    <div id="narrative-context-content" class="text-sm"></div>
+                                </div>
+                                <div id="result-list" class="space-y-3">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-lg shadow mt-4">
+                            <h3 class="text-lg font-semibold mb-4">Narrative Search</h3>
+                            <form id="narrative-search-form" class="mb-4">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div class="col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Search Query</label>
+                                        <input type="text" id="narrative-search-query" class="w-full p-2 border rounded" required>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Max Results</label>
+                                        <input type="number" id="narrative-search-top-k" class="w-full p-2 border rounded" value="3" min="1" max="10">
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="mt-4 py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                    Search Narratives
+                                </button>
+                            </form>
+                            
+                            <div id="narrative-search-results" class="mt-6 hidden">
+                                <h4 class="font-medium mb-2">Narrative Search Results</h4>
+                                <div id="narrative-result-list" class="space-y-3">
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Visualizations Section -->
+                    <section id="visualizations-section" class="section-content hidden">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                            <!-- Memory Timeline Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Memory Timeline</h3>
+                                <div id="memory-timeline-vis" class="w-full h-64"></div>
+                            </div>
+                            
+                            <!-- Category Usage Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Category Usage</h3>
+                                <canvas id="category-usage-chart" height="200"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-lg shadow mb-4">
+                            <h3 class="text-lg font-semibold mb-4">Category Network</h3>
+                            <div id="category-network-vis" class="w-full h-96 border rounded"></div>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">Narrative Graph</h3>
+                            <div id="narrative-graph-vis" class="w-full h-96 border rounded"></div>
+                        </div>
+                    </section>
+
+                    <!-- Feedback Loop Section -->
+                    <section id="feedback-section" class="section-content hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <!-- Run Feedback Cycle Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Feedback Cycle</h3>
+                                <p class="mb-4 text-sm text-gray-600">Run a feedback cycle to improve the memory system organization. This process analyzes the current state and suggests improvements.</p>
+                                <div class="flex space-x-2">
+                                    <button id="run-feedback-btn" class="flex-1 py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                        Run Analysis
+                                    </button>
+                                    <button id="apply-feedback-btn" class="flex-1 py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700">
+                                        Run & Apply
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Quality Metrics Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Quality Metrics</h3>
+                                <div id="quality-metrics" class="text-sm">
+                                    <p class="text-center text-gray-500 py-4">Click "Get Metrics" to view system quality metrics</p>
+                                </div>
+                                <button id="get-metrics-btn" class="mt-4 w-full py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                                    Get Metrics
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4">Improvement Suggestions</h3>
+                            <div id="improvement-suggestions" class="text-sm">
+                                <p class="text-center text-gray-500 py-4">Run a feedback cycle to view suggestions</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-lg shadow mt-4">
+                            <h3 class="text-lg font-semibold mb-4">Narrative Pattern Analysis</h3>
+                            <div class="flex items-center mb-4">
+                                <label class="text-sm mr-2">Minimum memories:</label>
+                                <input type="number" id="min-memories" class="p-1 border rounded w-16" value="5" min="3">
+                                <button id="run-pattern-analysis-btn" class="ml-4 py-1 px-3 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
+                                    Identify Patterns
+                                </button>
+                            </div>
+                            <div id="narrative-patterns" class="text-sm">
+                                <p class="text-center text-gray-500 py-4">Run pattern analysis to view results</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Consciousness Metrics Section -->
+                    <section id="consciousness-section" class="section-content hidden">
+                        <div class="bg-white p-4 rounded-lg shadow mb-4">
+                            <h3 class="text-lg font-semibold mb-4">About Consciousness Metrics</h3>
+                            <p class="text-gray-600 mb-2">This section explores how emergent consciousness might be measured in the memory system.</p>
+                            <p class="text-gray-600 mb-2">We use several metrics inspired by theories of consciousness to evaluate the system's development:</p>
+                            <ul class="list-disc ml-6 text-gray-600 mb-4">
+                                <li><strong>Integration</strong>: How well different memories and categories are connected</li>
+                                <li><strong>Coherence</strong>: The consistency and organization of narratives</li>
+                                <li><strong>Self-reference</strong>: The system's ability to reflect on its own structure</li>
+                                <li><strong>Temporality</strong>: Understanding of time and sequence in memories</li>
+                                <li><strong>Prediction</strong>: Ability to project expectations based on past experiences</li>
+                            </ul>
+                            <p class="text-gray-600">These metrics don't define consciousness but provide a framework for exploring emergent properties.</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <!-- Integration Metrics Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Integration Metrics</h3>
+                                <canvas id="integration-chart" height="200"></canvas>
+                                <div class="mt-4 text-sm text-gray-600">
+                                    <p>Integration measures how well connected the system's memory components are. Higher integration suggests more complex information processing.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Coherence Metrics Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Coherence Metrics</h3>
+                                <canvas id="coherence-chart" height="200"></canvas>
+                                <div class="mt-4 text-sm text-gray-600">
+                                    <p>Coherence measures how well organized and consistent the narratives and categories are. Higher coherence suggests more meaningful organization.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- Self-Reference Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Self-Reference</h3>
+                                <div class="flex justify-center">
+                                    <div class="w-24 h-24 rounded-full border-4 border-indigo-500 flex items-center justify-center">
+                                        <span id="self-reference-score" class="text-2xl font-bold text-indigo-500">0%</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-sm text-gray-600">
+                                    <p>Measures the system's ability to reflect on its own structure and functioning.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Temporality Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Temporality</h3>
+                                <div class="flex justify-center">
+                                    <div class="w-24 h-24 rounded-full border-4 border-indigo-500 flex items-center justify-center">
+                                        <span id="temporality-score" class="text-2xl font-bold text-indigo-500">0%</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-sm text-gray-600">
+                                    <p>Measures the system's understanding of time and sequence in its memories.</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Prediction Card -->
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-lg font-semibold mb-4">Prediction</h3>
+                                <div class="flex justify-center">
+                                    <div class="w-24 h-24 rounded-full border-4 border-indigo-500 flex items-center justify-center">
+                                        <span id="prediction-score" class="text-2xl font-bold text-indigo-500">0%</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 text-sm text-gray-600">
+                                    <p>Measures the system's ability to project expectations based on past experiences.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-4 rounded-lg shadow mt-4">
+                            <h3 class="text-lg font-semibold mb-4">Consciousness Evolution</h3>
+                            <canvas id="consciousness-evolution-chart" height="200"></canvas>
+                            <div class="mt-4 text-sm text-gray-600">
+                                <p>This chart shows the evolution of consciousness metrics over time as the system grows and learns.</p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white p-4 mt-8">
+            <div class="container mx-auto text-center">
+                <p>Memory System Dashboard &copy; 2025</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <!-- Add Memory Modal -->
+    <div id="add-memory-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg max-w-lg w-full mx-4 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Add Memory</h3>
+                <button class="close-modal text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="add-memory-form">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                    <textarea id="memory-content" class="w-full p-2 border rounded" rows="5" required></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Categories (comma-separated)</label>
+                    <input type="text" id="memory-categories" class="w-full p-2 border rounded" placeholder="e.g., personal, technical">
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" class="close-modal mr-2 py-2 px-4 border rounded">Cancel</button>
+                    <button type="submit" class="py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">Add Memory</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- View Memory Modal -->
+    <div id="view-memory-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg max-w-lg w-full mx-4 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">View Memory</h3>
+                <button class="close-modal text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="mb-4">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Memory ID:</span>
+                <span id="view-memory-id" class="block p-2 bg-gray-100 rounded"></span>
+            </div>
+            <div class="mb-4">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Content:</span>
+                <div id="view-memory-content" class="block p-2 bg-gray-100 rounded whitespace-pre-wrap"></div>
+            </div>
+            <div class="mb-4">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Categories:</span>
+                <div id="view-memory-categories" class="block p-2 bg-gray-100 rounded"></div>
+            </div>
+            <div class="mb-4">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Timestamp:</span>
+                <span id="view-memory-timestamp" class="block p-2 bg-gray-100 rounded"></span>
+            </div>
+            <div class="flex justify-end">
+                <button type="button" class="close-modal py-2 px-4 border rounded">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- View Narrative Modal -->
+    <div id="view-narrative-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg max-w-3xl w-full mx-4 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold" id="narrative-modal-title">View Narrative</h3>
+                <button class="close-modal text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="mb-4">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Description:</span>
+                <div id="view-narrative-description" class="block p-2 bg-gray-100 rounded whitespace-pre-wrap"></div>
+            </div>
+            <div class="mb-4">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Categories:</span>
+                <div id="view-narrative-categories" class="block p-2 bg-gray-100 rounded"></div>
+            </div>
+            <div class="mb-4">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Narrative Points:</span>
+                <div id="view-narrative-points" class="block p-2 bg-gray-100 rounded space-y-2"></div>
+            </div>
+            <div class="flex justify-end">
+                <button type="button" class="close-modal py-2 px-4 border rounded">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Point to Narrative Modal -->
+    <div id="add-point-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg max-w-lg w-full mx-4 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Add Narrative Point</h3>
+                <button class="close-modal text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="add-point-form">
+                <input type="hidden" id="point-narrative-id">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                    <textarea id="point-content" class="w-full p-2 border rounded" rows="5" required></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Linked Memory IDs (comma-separated)</label>
+                    <input type="text" id="point-linked-memories" class="w-full p-2 border rounded" placeholder="e.g., 0,1,3">
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" class="close-modal mr-2 py-2 px-4 border rounded">Cancel</button>
+                    <button type="submit" class="py-2 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">Add Point</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main JavaScript -->
+    <script>
+        // API URL
+        const API_URL = 'http://localhost:8000';
+        
+        // State
+        let state = {
+            memories: [],
+            categories: {},
+            narratives: [],
+            currentPage: 0,
+            pageSize: 10,
+            searchResults: null,
+            narrativeSearchResults: null,
+            consciousnessMetrics: {
+                integration: [0, 0, 0, 0, 0, 0],
+                coherence: [0, 0, 0, 0, 0, 0],
+                selfReference: 0,
+                temporality: 0,
+                prediction: 0,
+                history: []
+            }
+        };
+        
+        // DOM Elements
+        document.addEventListener('DOMContentLoaded', () => {
+            // Navigation
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Hide all sections
+                    document.querySelectorAll('.section-content').forEach(section => {
+                        section.classList.add('hidden');
+                    });
+                    
+                    // Remove active class from all buttons
+                    document.querySelectorAll('.nav-btn').forEach(btn => {
+                        btn.classList.remove('bg-indigo-200');
+                    });
+                    
+                    // Show selected section
+                    const sectionId = btn.dataset.section;
+                    document.getElementById(`${sectionId}-section`).classList.remove('hidden');
+                    
+                    // Add active class to button
+                    btn.classList.add('bg-indigo-200');
+                    
+                    // Load section data if needed
+                    if (sectionId === 'memories') {
+                        loadMemories();
+                    } else if (sectionId === 'categories') {
+                        loadCategories();
+                    } else if (sectionId === 'narratives') {
+                        loadNarratives();
+                    } else if (sectionId === 'visualizations') {
+                        loadVisualizations();
+                    } else if (sectionId === 'consciousness') {
+                        loadConsciousnessMetrics();
+                    }
+                });
+            });
+            
+            // Memory form
+            const addMemoryForm = document.getElementById('add-memory-form');
+            addMemoryForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                addMemory();
+            });
+            
+            // Category form
+            const addCategoryForm = document.getElementById('add-category-form');
+            addCategoryForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                addCategory();
+            });
+            
+            // Relationship form
+            const addRelationshipForm = document.getElementById('add-relationship-form');
+            addRelationshipForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                addRelationship();
+            });
+            
+            // Narrative form
+            const createNarrativeForm = document.getElementById('create-narrative-form');
+            createNarrativeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                createNarrative();
+            });
+            
+            // Generate narrative form
+            const generateNarrativeForm = document.getElementById('generate-narrative-form');
+            generateNarrativeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                generateNarrative();
+            });
+            
+            // Add point form
+            const addPointForm = document.getElementById('add-point-form');
+            addPointForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                addNarrativePoint();
+            });
+            
+            // Memory search form
+            const memorySearchForm = document.getElementById('memory-search-form');
+            memorySearchForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                searchMemories();
+            });
+            
+            // Narrative search form
+            const narrativeSearchForm = document.getElementById('narrative-search-form');
+            narrativeSearchForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                searchNarratives();
+            });
+            
+            // Feedback buttons
+            document.getElementById('run-feedback-btn').addEventListener('click', () => {
+                runFeedbackCycle(false);
+            });
+            
+            document.getElementById('apply-feedback-btn').addEventListener('click', () => {
+                runFeedbackCycle(true);
+            });
+            
+            document.getElementById('get-metrics-btn').addEventListener('click', getQualityMetrics);
+            
+            document.getElementById('run-pattern-analysis-btn').addEventListener('click', identifyPatterns);
+            
+            // Add memory buttons
+            document.getElementById('add-memory-btn').addEventListener('click', showAddMemoryModal);
+            document.getElementById('add-memory-btn-2').addEventListener('click', showAddMemoryModal);
+            
+            // Modal close buttons
+            document.querySelectorAll('.close-modal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.fixed').forEach(modal => {
+                        modal.classList.add('hidden');
+                    });
+                });
+            });
+            
+            // Evolution category selector
+            document.getElementById('evolution-category').addEventListener('change', (e) => {
+                const category = e.target.value;
+                if (category) {
+                    getCategoryEvolution(category);
+                }
+            });
+            
+            // Semantic weight slider
+            document.getElementById('search-semantic-weight').addEventListener('input', (e) => {
+                document.getElementById('semantic-weight-value').textContent = e.target.value;
+            });
+            
+            // Memory pagination
+            document.getElementById('memory-prev-page').addEventListener('click', () => {
+                if (state.currentPage > 0) {
+                    state.currentPage--;
+                    loadMemories();
+                }
+            });
+            
+            document.getElementById('memory-next-page').addEventListener('click', () => {
+                const totalPages = Math.ceil(state.memories.length / state.pageSize);
+                if (state.currentPage < totalPages - 1) {
+                    state.currentPage++;
+                    loadMemories();
+                }
+            });
+            
+            // Memory category filter
+            document.getElementById('memory-category-filter').addEventListener('change', (e) => {
+                const category = e.target.value;
+                loadMemories(category);
+            });
+            
+            // Narrative category filter
+            document.getElementById('narrative-category-filter').addEventListener('change', (e) => {
+                const category = e.target.value;
+                loadNarratives(category);
+            });
+            
+            // Initialize dashboard
+            loadDashboard();
+        });
+        
+        // ---- API Functions ----
+        
+        // Dashboard
+        async function loadDashboard() {
+            try {
+                const statsResponse = await fetch(`${API_URL}/analysis/statistics`);
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    updateDashboardStats(stats);
+                }
+                
+                const categoriesResponse = await fetch(`${API_URL}/categories/`);
+                if (categoriesResponse.ok) {
+                    const categoriesData = await categoriesResponse.json();
+                    state.categories = categoriesData.categories;
+                    updateCategorySelects();
+                    updateCategoryCharts(stats);
+                }
+                
+                await loadMemories(null, true);
+                await loadNarratives(null, true);
+                
+                // Initialize consciousness metrics
+                initConsciousnessCharts();
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+        
+        // Memories
+        async function loadMemories(category = null, dashboard = false) {
+            try {
+                let url = `${API_URL}/memories/?skip=${state.currentPage * state.pageSize}&limit=${state.pageSize}`;
+                if (category) {
+                    url += `&category=${category}`;
+                }
+                
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    state.memories = data;
+                    
+                    updateMemoriesList();
+                    
+                    if (dashboard) {
+                        updateRecentMemories();
+                    }
+                    
+                    // Update counts
+                    document.getElementById('memory-count').textContent = `${state.memories.length} Memories`;
+                    document.getElementById('memory-total').textContent = state.memories.length;
+                }
+            } catch (error) {
+                console.error('Error loading memories:', error);
+            }
+        }
+        
+        function updateMemoriesList() {
+            const memoriesList = document.getElementById('memories-list');
+            const start = state.currentPage * state.pageSize;
+            const end = start + state.pageSize;
+            
+            if (!state.memories || state.memories.length === 0) {
+                memoriesList.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-4 py-4 text-center text-gray-500">No memories found</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            memoriesList.innerHTML = state.memories.map((item, index) => {
+                const memory = item.memory;
+                return `
+                    <tr>
+                        <td class="px-4 py-2">${item.memory_id}</td>
+                        <td class="px-4 py-2">${memory.content.length > 50 ? memory.content.substring(0, 50) + '...' : memory.content}</td>
+                        <td class="px-4 py-2">
+                            ${memory.categories && memory.categories.length ? 
+                                memory.categories.map(cat => 
+                                    `<span class="inline-block bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded mr-1 mb-1">${cat}</span>`
+                                ).join('') : 
+                                '<span class="text-gray-400">None</span>'
+                            }
+                        </td>
+                        <td class="px-4 py-2">${formatDate(memory.timestamp)}</td>
+                        <td class="px-4 py-2">
+                            <button class="view-memory-btn text-indigo-600 hover:text-indigo-900 mr-2" data-id="${item.memory_id}">View</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Add event listeners
+            document.querySelectorAll('.view-memory-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    viewMemory(parseInt(btn.dataset.id));
+                });
+            });
+            
+            // Update pagination
+            const totalMemories = state.memories.length;
+            const totalPages = Math.ceil(totalMemories / state.pageSize);
+            const currentPage = state.currentPage + 1;
+            
+            document.getElementById('memory-pagination-info').textContent = 
+                `Showing ${start + 1}-${Math.min(end, totalMemories)} of ${totalMemories}`;
+            
+            document.getElementById('memory-prev-page').disabled = state.currentPage === 0;
+            document.getElementById('memory-next-page').disabled = state.currentPage >= totalPages - 1;
+        }
+        
+        function updateRecentMemories() {
+            const recentMemoriesList = document.getElementById('recent-memories-list');
+            
+            if (!state.memories || state.memories.length === 0) {
+                recentMemoriesList.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-4 text-center text-gray-500">No memories found</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            // Get at most 5 most recent memories
+            const recentMemories = [...state.memories].sort((a, b) => {
+                return new Date(b.memory.timestamp) - new Date(a.memory.timestamp);
+            }).slice(0, 5);
+            
+            recentMemoriesList.innerHTML = recentMemories.map((item) => {
+                const memory = item.memory;
+                return `
+                    <tr>
+                        <td class="px-4 py-2">${item.memory_id}</td>
+                        <td class="px-4 py-2">${memory.content.length > 50 ? memory.content.substring(0, 50) + '...' : memory.content}</td>
+                        <td class="px-4 py-2">
+                            ${memory.categories && memory.categories.length ? 
+                                memory.categories.map(cat => 
+                                    `<span class="inline-block bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded mr-1 mb-1">${cat}</span>`
+                                ).join('') : 
+                                '<span class="text-gray-400">None</span>'
+                            }
+                        </td>
+                        <td class="px-4 py-2">
+                            <button class="view-memory-btn-dash text-indigo-600 hover:text-indigo-900" data-id="${item.memory_id}">View</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Add event listeners
+            document.querySelectorAll('.view-memory-btn-dash').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    viewMemory(parseInt(btn.dataset.id));
+                });
+            });
+        }
+        
+        async function addMemory() {
+            const content = document.getElementById('memory-content').value;
+            const categoriesStr = document.getElementById('memory-categories').value;
+            const categories = categoriesStr ? categoriesStr.split(',').map(c => c.trim()) : [];
+            
+            try {
+                const response = await fetch(`${API_URL}/memories/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        content,
+                        categories,
+                        metadata: {}
+                    })
+                });
+                
+                if (response.ok) {
+                    // Close modal
+                    document.getElementById('add-memory-modal').classList.add('hidden');
+                    
+                    // Clear form
+                    document.getElementById('memory-content').value = '';
+                    document.getElementById('memory-categories').value = '';
+                    
+                    // Reload memories
+                    await loadMemories();
+                    
+                    // Also update dashboard
+                    await loadDashboard();
+                    
+                    alert('Memory added successfully!');
+                } else {
+                    const error = await response.json();
+                    alert(`Error adding memory: ${error.detail}`);
+                }
+            } catch (error) {
+                console.error('Error adding memory:', error);
+                alert('Error adding memory. See console for details.');
+            }
+        }
+        
+        function viewMemory(id) {
+            // Find memory
+            const memoryItem = state.memories.find(m => m.memory_id === id);
+            if (!memoryItem) {
+                alert('Memory not found');
+                return;
+            }
+            
+            const memory = memoryItem.memory;
+            
+            // Populate modal
+            document.getElementById('view-memory-id').textContent = id;
+            document.getElementById('view-memory-content').textContent = memory.content;
+            document.getElementById('view-memory-categories').innerHTML = memory.categories && memory.categories.length ? 
+                memory.categories.map(cat => 
+                    `<span class="inline-block bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded mr-1 mb-1">${cat}</span>`
+                ).join('') : 
+                '<span class="text-gray-400">None</span>';
+            document.getElementById('view-memory-timestamp').textContent = formatDate(memory.timestamp);
+            
+            // Show modal
+            document.getElementById('view-memory-modal').classList.remove('hidden');
+        }
+        
+        function showAddMemoryModal() {
+            document.getElementById('add-memory-modal').classList.remove('hidden');
+        }
+        
+        // Categories
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_URL}/categories/`);
+                if (response.ok) {
+                    const data = await response.json();
+                    state.categories = data.categories;
+                    
+                    updateCategoriesList();
+                    updateCategorySelects();
+                    
+                    // Update count
+                    document.getElementById('category-count').textContent = `${Object.keys(state.categories).length} Categories`;
+                    document.getElementById('category-total').textContent = Object.keys(state.categories).length;
+                }
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+        
+        function updateCategoriesList() {
+            const categoriesList = document.getElementById('categories-list');
+            
+            if (!state.categories || Object.keys(state.categories).length === 0) {
+                categoriesList.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-4 py-4 text-center text-gray-500">No categories found</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            categoriesList.innerHTML = Object.entries(state.categories).map(([name, info]) => {
+                // Count memories in this category
+                const memoryCount = state.memories.filter(item => 
+                    item.memory.categories && item.memory.categories.includes(name)
+                ).length;
+                
+                return `
+                    <tr>
+                        <td class="px-4 py-2">${name}</td>
+                        <td class="px-4 py-2">${info.description.length > 50 ? info.description.substring(0, 50) + '...' : info.description}</td>
+                        <td class="px-4 py-2">${info.version}</td>
+                        <td class="px-4 py-2">
+                            <span class="inline-block ${info.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'} text-xs px-2 py-1 rounded">
+                                ${info.status}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2">${memoryCount}</td>
+                        <td class="px-4 py-2">
+                            <button class="view-category-btn text-indigo-600 hover:text-indigo-900" data-name="${name}">View Evolution</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Add event listeners
+            document.querySelectorAll('.view-category-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('evolution-category').value = btn.dataset.name;
+                    getCategoryEvolution(btn.dataset.name);
+                });
+            });
+        }
+        
+        function updateCategorySelects() {
+            // Get all selects that need category options
+            const selects = [
+                'memory-category-filter',
+                'relationship-source',
+                'relationship-target',
+                'evolution-category',
+                'narrative-categories',
+                'search-categories'
+            ];
+            
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+                
+                // Keep the first option (usually "All Categories" or "Select...")
+                const firstOption = select.options[0];
+                select.innerHTML = '';
+                select.appendChild(firstOption);
+                
+                // Add category options
+                if (state.categories) {
+                    Object.entries(state.categories)
+                        .filter(([_, info]) => info.status === 'active')
+                        .forEach(([name, info]) => {
+                            const option = document.createElement('option');
+                            option.value = name;
+                            option.textContent = name;
+                            select.appendChild(option);
+                        });
+                }
+            });
+        }
+        
+        async function addCategory() {
+            const name = document.getElementById('category-name').value;
+            const description = document.getElementById('category-description').value;
+            
+            try {
+                const response = await fetch(`${API_URL}/categories/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description
+                    })
+                });
+                
+                if (response.ok) {
+                    // Clear form
+                    document.getElementById('category-name').value = '';
+                    document.getElementById('category-description').value = '';
+                    
+                    // Reload categories
+                    await loadCategories();
+                    
+                    alert('Category added successfully!');
+                } else {
+                    const error = await response.json();
+                    alert(`Error adding category: ${error.detail}`);
+                }
+            } catch (error) {
+                console.error('Error adding category:', error);
+                alert('Error adding category. See console for details.');
+            }
+        }
+        
+        async function addRelationship() {
+            const source = document.getElementById('relationship-source').value;
+            const relationship_type = document.getElementById('relationship-type').value;
+            const target = document.getElementById('relationship-target').value;
+            
+            if (source === target) {
+                alert('Source and target categories cannot be the same');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/relationships/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        source,
+                        relationship_type,
+                        target,
+                        description: `${source} ${relationship_type} ${target}`
+                    })
+                });
+                
+                if (response.ok) {
+                    // Clear form
+                    document.getElementById('relationship-type').value = '';
+                    
+                    // Reload categories to see the updated relationships
+                    await loadCategories();
+                    
+                    alert('Relationship added successfully!');
+                } else {
+                    const error = await response.json();
+                    alert(`Error adding relationship: ${error.detail}`);
+                }
+            } catch (error) {
+                console.error('Error adding relationship:', error);
+                alert('Error adding relationship. See console for details.');
+            }
+        }
+        
+        async function getCategoryEvolution(category) {
+            try {
+                const response = await fetch
