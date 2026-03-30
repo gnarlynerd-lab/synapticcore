@@ -9,6 +9,7 @@ from .memory.enhanced import EnhancedMemory
 from .memory.feedback import MemoryFeedbackLoop
 from .memory.types import Position, Tension, Precedent
 from .memory.type_managers import PositionManager, TensionManager, PrecedentManager
+from .memory.arcs import ArcTracker
 from .storage.json_store import JsonFileStore
 from .llm.provider import LLMProvider, create_provider
 
@@ -40,6 +41,9 @@ class SynapticCore:
         self.positions = PositionManager(self.memory)
         self.tensions = TensionManager(self.memory)
         self.precedents = PrecedentManager(self.memory)
+
+        # Arc tracking
+        self.arcs = ArcTracker(self.positions, self.tensions)
 
         # Load typed data from storage
         self._load_types()

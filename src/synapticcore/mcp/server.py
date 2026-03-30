@@ -68,6 +68,7 @@ def store_interaction(
     tensions: list[dict] | None = None,
     precedents: list[dict] | None = None,
     session_summary: str = "",
+    relationship_hint: str = "",
 ) -> str:
     """Store structured intellectual content from a conversation.
 
@@ -77,9 +78,13 @@ def store_interaction(
     Each position: {"statement": str, "confidence": "tentative"|"held"|"committed", "context": str}
     Each tension: {"poles": [str, str], "description": str, "status": "active"|"explored"|"resolved"}
     Each precedent: {"statement": str, "held": bool, "context": str}
+    relationship_hint: Optional hint about how new positions relate to existing ones,
+        e.g. "contradicts previous position on X" or "reinforces earlier commitment to Y".
+        The calling LLM has conversational context the memory system doesn't.
     """
     core = get_core()
     stored = []
+    arc_detections = []
 
     for pos in (positions or []):
         obj = core.positions.create(
@@ -88,6 +93,11 @@ def store_interaction(
             context=pos.get("context", ""),
         )
         stored.append(f"position:{obj.id[:8]}")
+
+        # Auto-detect relationship to existing positions
+        detection = core.arcs.detect_relationship(obj, relationship_hint=relationship_hint)
+        if detection:
+            arc_detections.append(detection)
 
     for ten in (tensions or []):
         obj = core.tensions.create(
@@ -115,7 +125,14 @@ def store_interaction(
     # Persist typed data
     core.save()
 
-    return f"Stored {len(stored)} items: {', '.join(stored)}"
+    # Build response
+    parts = [f"Stored {len(stored)} items: {', '.join(stored)}"]
+    for det in arc_detections:
+        parts.append(
+            f"Arc detected: {det['type']} — {det['explanation']}"
+        )
+
+    return "\n".join(parts)
 
 
 def _typed_search_results(core, query: str, top_k: int = 5) -> list[dict]:
@@ -217,67 +234,16 @@ def get_intellectual_arc(
 ) -> dict:
     """Trace how the user's position on a topic has evolved over time.
 
+    Returns a chronological chain of positions with transition classifications
+    (reinforcement/shift/reversal), trajectory analysis (converging/oscillating/
+    deepening), and recurring tensions.
+
     Args:
         topic: The subject or tension to trace.
         time_range: Optional date range filter (not yet implemented).
-
-    Returns a chronological sequence of related positions and tensions.
     """
     core = get_core()
-
-    # Search typed positions and tensions
-    pos_results = core.positions.search(topic, top_k=10)
-    ten_results = core.tensions.search(topic, top_k=5)
-
-    positions = []
-    for r in pos_results:
-        p = r["item"]
-        positions.append({
-            "id": p.id,
-            "statement": p.statement,
-            "confidence": p.confidence,
-            "context": p.context,
-            "timestamp": p.timestamp,
-            "evolution": p.evolution,
-            "score": round(r["similarity"], 3),
-        })
-    positions.sort(key=lambda x: x["timestamp"])
-
-    tensions = []
-    for r in ten_results:
-        t = r["item"]
-        tensions.append({
-            "id": t.id,
-            "poles": t.poles,
-            "description": t.description,
-            "status": t.status,
-            "timestamp": t.timestamp,
-            "engagement_count": len(t.engagement_history),
-            "score": round(r["similarity"], 3),
-        })
-    tensions.sort(key=lambda x: x["timestamp"])
-
-    # Also search general memories for context
-    memory_results = core.memory.enhanced_hybrid_search(topic, top_k=5, recursive_depth=1)
-    general = [
-        {
-            "content": r["memory"]["content"],
-            "timestamp": r["memory"].get("timestamp", ""),
-            "categories": r["memory"].get("categories", []),
-            "score": round(r["combined_score"], 3),
-        }
-        for r in memory_results
-        if r["combined_score"] > 0.3
-    ]
-    general.sort(key=lambda x: x["timestamp"])
-
-    return {
-        "topic": topic,
-        "positions": positions,
-        "tensions": tensions,
-        "related_memories": general[:5],
-        "note": "v2: typed positions with evolution history. Arc detection (reinforcement/shift/reversal) coming in Phase 4."
-    }
+    return core.arcs.get_arc(topic, time_range=time_range)
 
 
 @mcp.tool()
@@ -427,10 +393,10 @@ def assess_depth(
     # Check for active tensions
     active_tensions = [r for r in ten_results if r["item"].status == "active"]
 
-    # Check recurring tensions
-    recurring = core.tensions.get_recurring(min_engagements=2)
-    recurring_nearby = [t for t in recurring if any(
-        r["item"].id == t.id for r in ten_results
+    # Check recurring tensions via arc tracker
+    all_recurring = core.arcs.detect_recurring_tensions(min_engagements=2)
+    recurring_nearby = [t for t in all_recurring if any(
+        r["item"].id == t["id"] for r in ten_results
     )]
 
     has_deeper_structure = (

@@ -158,13 +158,14 @@ class TestGetIntellectualArc:
         arc = get_intellectual_arc("architecture choices")
         assert "topic" in arc
         assert "positions" in arc
-        assert "tensions" in arc
+        assert "trajectory" in arc
+        assert "recurring_tensions" in arc
         assert isinstance(arc["positions"], list)
 
     def test_arc_empty_store(self):
         arc = get_intellectual_arc("anything")
         assert arc["positions"] == []
-        assert arc["tensions"] == []
+        assert arc["trajectory"] == "insufficient_data"
 
 
 # ─── find_adjacent ──────────────────────────────────────────────────────
